@@ -1,0 +1,5 @@
+slug,nome,escopo
+aplicacoes-corporativas,Aplicações Corporativas,"Erro, travamento e falha funcional das aplicações da casa."
+identidade-acessos,Identidade e Acessos,"Bloqueio de conta, senha, MFA e permissão de uso dentro de uma aplicação."
+infra-conectividade,Infraestrutura e Conectividade,"Rede, VPN, indisponibilidade geral e problemas de conexão."
+operacoes-financeiras,Operações Financeiras,"Regra de negócio, aprovação pendente e dúvida operacional do processo financeiro."

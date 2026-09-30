@@ -1,7 +1,9 @@
 # Backend — Reboot Cafeinado
 
-API em Express 5 + TypeScript (ESM) e gateway de chat em WebSocket (socket.io)
-entre cliente e suporte.
+API em Express 5 + TypeScript (ESM) do Chamado Pronto (agente no Kaffa AI Hub, triagem,
+Postgres) e WebSocket (socket.io) com dois namespaces: `/chamados` (chat do chamado, primeiro com o agente
+e depois com o atendente, e fila de triagem em tempo real) e `/` (chat ao vivo entre cliente e suporte). O fluxo do
+Chamado Pronto, o Hub e o banco estão no `README.md` da raiz.
 
 ## Rodando
 
@@ -12,7 +14,9 @@ npm run dev            # tsx watch, http://localhost:3333
 ```
 
 Scripts: `dev` (watch), `build` (tsc → `dist/`), `start` (roda o build),
-`typecheck`, `smoke` (ver abaixo).
+`typecheck`, `test` (regras do contrato e SSE), `smoke` (chat ao vivo, ver abaixo),
+`smoke-chamados` (WebSocket do Chamado Pronto, com o Hub simulado), `smoke-hub` (agente real)
+e os comandos de administração (`gerar-token`, `acesso-banco`, `exportar-catalogo`…) do `README.md` da raiz.
 
 O frontend sobe em paralelo, na porta 3000:
 
@@ -24,16 +28,27 @@ cd frontend && npm run dev
 
 ```
 src/
-  server.ts               # http server + gateway do socket.io
-  app.ts                  # montagem do express (cors, json, rotas, erros)
-  env.ts                  # leitura de .env
-  routes/index.ts         # router raiz, montado em /api
-  routes/health.ts        # GET /api/health
-  middlewares/            # not-found (404) e error-handler (500)
-  chat/types.ts           # contrato de eventos (espelhado em frontend/lib/chat/types.ts)
+  server.ts               # banco + http server + socket.io (namespaces / e /chamados)
+  app.ts                  # montagem do express (cors, json, cookie, rotas, erros)
+  config/env.ts           # leitura de .env
+  routes/                 # GET /api/health
+  rotas/index.ts          # API do Chamado Pronto em /api (sessão, chamados, triagem, admin)
+  conector/               # conector API REST que o Hub consulta (/hub/v1)
+  middlewares/            # not-found (404) e error-handler ({ erro, mensagem })
+  db/                     # Postgres (Supabase) ou PGlite, schema e carga inicial
+  dados/csv.ts            # leitura de dados/<empresa>/*.csv
+  dominio/                # chamados, triagem, contrato do agente, catálogo, tokens, acesso do Hub ao banco
+  dominio/eventos.ts      # barramento em memória: o domínio avisa o que mudou
+  hub/                    # cliente do Kaffa AI Hub (SSE) e Hub simulado
+  tempo-real/tipos.ts     # contrato do /chamados (espelhado em frontend/lib/tempo-real/tipos.ts)
+  tempo-real/gateway.ts   # namespace /chamados: autentica pelo cookie e repassa os eventos às salas
+  chat/types.ts           # contrato do chat ao vivo (espelhado em frontend/lib/chat/types.ts)
   chat/store.ts           # conversas e mensagens em memória
-  chat/gateway.ts         # handlers do socket.io
-scripts/smoke-chat.mjs    # teste de fumaça do chat (npm run smoke)
+  chat/gateway.ts         # namespace / do socket.io (chat ao vivo)
+scripts/smoke-chat.mjs      # teste de fumaça do chat ao vivo (npm run smoke)
+scripts/smoke-chamados.mjs  # teste de fumaça do /chamados (npm run smoke-chamados)
+scripts/smoke-hub.ts        # dois turnos com o agente real (npm run smoke-hub)
+scripts/admin.ts            # administração com o backend rodando
 ```
 
 Para uma nova rota: crie `src/routes/<nome>.ts` exportando um `Router` e registre em
@@ -83,3 +98,12 @@ mexeu em um, atualize o outro.
 | `NODE_ENV` | `development` | Em `development` o handler de erro devolve o stack |
 | `CORS_ORIGIN` | `http://localhost:3000` | Origens permitidas (HTTP e WebSocket), separadas por vírgula |
 | `SUPPORT_TOKEN` | `suporte-dev` | Segredo do painel de suporte — placeholder até haver login real |
+| `SESSION_SECRET` | `dev-somente-local` | Assina o cookie de sessão do Chamado Pronto (API e handshake do `/chamados`) |
+| `DATABASE_URL` | vazio | Postgres (Supabase). Vazio = PGlite em `PGLITE_DIR` |
+| `DATABASE_SSL_CA` | vazio | Certificado da CA do Supabase, para verificar o servidor |
+| `PGLITE_DIR` | `~/.reboot-cafeinado/pgdata` | Pasta do Postgres embutido |
+| `HUB_MODE` | `real` com chave, senão `simulado` | `simulado` usa respostas fixas, sem custo |
+| `HUB_BASE_URL` | `https://belatrix.ai` | Endereço do Kaffa AI Hub |
+| `HUB_API_KEY` | vazio | Chave do Hub; com ela, o modo vira `real` |
+| `HUB_AGENTE_AURORA` | `06aadae6-…` | Agente Qualificador Aurora |
+| `HUB_TIMEOUT_MS` | `90000` | Tempo máximo de um turno do agente |

@@ -1,0 +1,6 @@
+slug,nome,uso,acesso,apelidos,observacao
+aurora-financeiro,Aurora Financeiro,Contas a pagar e a receber,Desktop,"financeiro, sistema financeiro, o financeiro","Instalado na máquina. Problema de acesso costuma ser credencial de rede, não do sistema."
+contafechamento,ContaFechamento,Lançamentos e fechamento contábil,Web,"contábil, fechamento, contabilidade","Fica indisponível na virada do mês, por janela de fechamento programada."
+despesacerta,DespesaCerta,Reembolsos e aprovações de despesa,Web e mobile,"despesas, reembolso, app de despesa",Aprovação depende de alçada do gestor. Pendência de aprovação não é erro.
+pagaflow,PagaFlow,Remessas e acompanhamento de pagamentos,Web,"portal de pagamentos, portal, pagamento","Remessa recusada pelo banco é regra de negócio, não defeito. Verificar antes de encaminhar como falha."
+visao-financeira,Visão Financeira,Relatórios e indicadores,Web,"painel, relatórios, bi","Só leitura. Dado desatualizado costuma ser atraso de carga, não falha de acesso."

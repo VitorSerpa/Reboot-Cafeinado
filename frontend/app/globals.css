@@ -1,26 +1,412 @@
 @import "tailwindcss";
 
+/* Identidade institucional Kaffa: laranja vibrante, soft black, azul denim; IBM Plex Sans (títulos) + Roboto (texto). */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --laranja: #e88f12;
+  --laranja-escuro: #c9760a;
+  --soft-black: #262626;
+  --denim: #4992b6;
+  --cinza: #6f6f6f;
+  --cinza-claro: #e8e8e8;
+  --fundo: #f6f5f3;
+  --branco: #ffffff;
+  --verde: #40bf55;
+  --amarelo: #f2d70d;
+  --vermelho: #df2040;
+  --bolha-agente: #fdf1e0;
+  --raio: 10px;
+  --sombra: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04);
 }
 
+/* As mesmas cores como utilitários do Tailwind (bg-laranja, text-cinza, border-cinza-claro…), usados no chat ao vivo. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-laranja: var(--laranja);
+  --color-laranja-escuro: var(--laranja-escuro);
+  --color-soft-black: var(--soft-black);
+  --color-denim: var(--denim);
+  --color-cinza: var(--cinza);
+  --color-cinza-claro: var(--cinza-claro);
+  --color-fundo: var(--fundo);
+  --color-verde: var(--verde);
+  --color-amarelo: var(--amarelo);
+  --color-vermelho: var(--vermelho);
+  --color-bolha-agente: var(--bolha-agente);
+  --font-sans: var(--font-roboto), system-ui, sans-serif;
+  --font-titulo: var(--font-plex), system-ui, sans-serif;
+  --shadow-cartao: var(--sombra);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* O preflight do Tailwind zera títulos e listas; aqui voltam no padrão da marca. */
+@layer base {
+  html,
+  body {
+    background: var(--fundo);
+    color: var(--soft-black);
+    font-family: var(--font-roboto), system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  h1,
+  h2,
+  h3,
+  .titulo {
+    font-family: var(--font-plex), system-ui, sans-serif;
+    font-weight: 600;
+    margin: 0;
+  }
+  h1 {
+    font-size: 1.75rem;
+    line-height: 1.25;
+  }
+  h2 {
+    font-size: 1.35rem;
+    line-height: 1.3;
+  }
+  h3 {
+    font-size: 1.05rem;
+  }
+  a {
+    color: var(--denim);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* --- cabeçalho --- */
+.cabecalho {
+  background: var(--soft-black);
+  color: var(--branco);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.cabecalho img {
+  height: 26px;
+}
+.cabecalho .produto {
+  font-family: var(--font-plex), sans-serif;
+  font-weight: 600;
+  font-size: 17px;
+  border-left: 1px solid #555;
+  padding-left: 16px;
+  color: var(--branco);
+  text-decoration: none;
+}
+.cabecalho .espaco {
+  flex: 1;
+}
+.cabecalho .usuario {
+  font-size: 13px;
+  color: #ddd;
+  text-align: right;
+}
+.cabecalho button {
+  background: transparent;
+  color: #ddd;
+  border: 1px solid #555;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+/* --- estrutura --- */
+.conteudo {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.cartao {
+  background: var(--branco);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 20px;
+}
+.pilha {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.linha {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.suave {
+  color: var(--cinza);
+  font-size: 13px;
+}
+
+/* --- botões e campos --- */
+.botao {
+  background: var(--laranja);
+  color: var(--branco);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+.botao:hover:not(:disabled) {
+  background: var(--laranja-escuro);
+}
+.botao:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.botao.secundario {
+  background: transparent;
+  color: var(--soft-black);
+  border: 1px solid var(--cinza-claro);
+}
+.botao.secundario:hover:not(:disabled) {
+  background: var(--fundo);
+}
+.campo {
+  width: 100%;
+  border: 1px solid #d4d4d4;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--branco);
+}
+.campo:focus {
+  outline: 2px solid var(--laranja);
+  border-color: transparent;
+}
+.campo:disabled {
+  opacity: 0.6;
+}
+label.rotulo {
+  font-size: 13px;
+  font-weight: 500;
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* --- avisos e selos --- */
+.aviso {
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+.aviso.erro {
+  background: #fdecef;
+  color: #a3132b;
+}
+.aviso.atencao {
+  background: #fff8d6;
+  color: #6b5a00;
+}
+.aviso.info {
+  background: #eaf3f8;
+  color: #1f5670;
+}
+.aviso.ok {
+  background: #e8f7ea;
+  color: #1e6b2b;
+}
+.selo {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 2px 10px;
+  background: var(--cinza-claro);
+  color: var(--soft-black);
+  white-space: nowrap;
+}
+.selo.laranja {
+  background: #fcebd3;
+  color: #8a5207;
+}
+.selo.verde {
+  background: #dff3e2;
+  color: #1e6b2b;
+}
+.selo.vermelho {
+  background: #fbdde2;
+  color: #a3132b;
+}
+.selo.azul {
+  background: #dcecf4;
+  color: #1f5670;
+}
+
+/* --- chat com o agente --- */
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 200px;
+}
+.bolha {
+  max-width: 78%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  white-space: pre-wrap;
+}
+/* Quem está olhando fica à direita: o solicitante em /chamado, o atendente em /triagem. */
+.bolha.solicitante,
+.bolha.analista {
+  align-self: flex-start;
+  background: var(--cinza-claro);
+  border-bottom-left-radius: 4px;
+}
+.bolha.analista {
+  background: #e3eff5;
+}
+.bolha.propria {
+  align-self: flex-end;
+  background: var(--soft-black);
+  color: var(--branco);
+  border-bottom-left-radius: 14px;
+  border-bottom-right-radius: 4px;
+}
+.bolha.agente {
+  align-self: flex-start;
+  background: var(--bolha-agente);
+  border-bottom-left-radius: 4px;
+}
+.bolha .autor {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
+.bolha.sistema {
+  align-self: center;
+  background: transparent;
+  color: var(--cinza);
+  font-size: 13px;
+}
+.digitando {
+  align-self: flex-start;
+  color: var(--cinza);
+  font-size: 13px;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.digitando::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--laranja);
+  animation: pulsar 1.2s ease-in-out infinite;
+}
+@keyframes pulsar {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* --- triagem --- */
+.triagem {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.item-fila {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--branco);
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 12px 14px;
+  cursor: pointer;
+  color: inherit;
+  text-decoration: none;
+}
+.item-fila:hover {
+  border-color: var(--cinza-claro);
+}
+.item-fila.ativo {
+  border-color: var(--laranja);
+}
+.item-fila .resumo {
+  font-size: 13px;
+  color: var(--cinza);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.grade {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 6px 14px;
+  font-size: 14px;
+}
+.grade dt {
+  color: var(--cinza);
+}
+.grade dd {
+  margin: 0;
+}
+.barra {
+  height: 8px;
+  background: var(--cinza-claro);
+  border-radius: 99px;
+  overflow: hidden;
+  width: 160px;
+}
+.barra span {
+  display: block;
+  height: 100%;
+}
+details.consulta {
+  border: 1px solid var(--cinza-claro);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+details.consulta.falhou {
+  border-color: #f0a8b4;
+  background: #fff5f7;
+}
+details.consulta pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--fundo);
+  padding: 8px;
+  border-radius: 6px;
+  max-height: 240px;
+  overflow: auto;
+}
+.secao h3 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cinza);
+  margin-bottom: 8px;
+}
+.secao ul {
+  list-style: disc;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+}
+
+@media (max-width: 860px) {
+  .triagem {
+    grid-template-columns: 1fr;
+  }
+  .grade {
+    grid-template-columns: 1fr;
+  }
 }

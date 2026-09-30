@@ -73,7 +73,7 @@ export function Composer({ onSend, onTypingChange, disabled, placeholder }: Comp
 
   return (
     <form
-      className="flex items-end gap-2 border-t border-zinc-200 p-3 dark:border-zinc-800"
+      className="flex items-end gap-2 border-t border-cinza-claro p-3"
       onSubmit={(event) => {
         event.preventDefault();
         void submit();
@@ -93,12 +93,12 @@ export function Composer({ onSend, onTypingChange, disabled, placeholder }: Comp
         rows={2}
         maxLength={MAX_MESSAGE_LENGTH}
         placeholder={placeholder ?? "Escreva sua mensagem…"}
-        className="flex-1 resize-none rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-zinc-500 disabled:opacity-50 dark:border-zinc-700"
+        className="campo flex-1 resize-none text-sm"
       />
       <button
         type="submit"
         disabled={disabled || sending || body.trim().length === 0}
-        className="h-10 rounded-lg bg-zinc-900 px-4 text-sm font-medium text-zinc-50 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900"
+        className="botao h-10"
       >
         {sending ? "…" : "Enviar"}
       </button>

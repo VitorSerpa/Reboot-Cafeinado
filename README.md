@@ -1,0 +1,246 @@
+# Reboot Cafeinado — Chamado Pronto
+
+Projeto do Reboot Cafeinado (Kaffa Journeys 2026): o funcionário descreve o problema em texto livre, o agente **Qualificador Aurora** no Kaffa AI Hub pergunta só o que falta e sugere a fila. Quando o agente conclui, o chamado entra direto na fila (não há passo de "enviar para o suporte"), e o atendente responde **no mesmo chat** em que o agente qualificou, além de confirmar ou corrigir a fila na tela de triagem. O chat e a fila andam em **tempo real, por WebSocket** (socket.io). Tem também um chat ao vivo entre cliente e atendente humano.
+
+```
+frontend/  Next 16 + Tailwind 4, identidade visual Kaffa:
+           entrada, /chamado (solicitante), /triagem (analista), /chat e /suporte (chat ao vivo)
+backend/   Express 5 + TypeScript + socket.io: API, regras sobre a resposta do agente, cliente do Hub (SSE),
+           Postgres, WebSocket (/chamados e chat ao vivo)
+dados/aurora/*.csv   carga inicial do contexto da Aurora no Postgres (o banco é a fonte da verdade)
+hub/prompt-qualificador-aurora.md          prompt em uso hoje no Hub (conector CSV)
+hub/prompt-qualificador-aurora-v4-banco.md prompt v4, para o conector PostgreSQL (banco no Supabase)
+hub/prompt-qualificador-aurora-v3-api.md   prompt v3, para quando o app for publicado e o conector de API for ligado
+docs/hub-recursos.md   o que existe no Hub e o histórico de mudanças
+```
+
+## Rodar
+
+Duas janelas de terminal:
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Abra http://localhost:3000 e escolha um usuário de teste: **Ana** ou **Carlos** (solicitantes) ou **Bruna** (analista). O chat ao vivo fica em `/chat` (cliente) e `/suporte` (atendente, com o `SUPPORT_TOKEN`).
+
+- **Sem `.env`, o backend usa o Hub simulado:** respostas fixas, sem chave e sem custo. O cabeçalho mostra "Hub: simulado".
+- **Banco:** Postgres embutido (PGlite), em `~/.reboot-cafeinado/pgdata`, fora do OneDrive. Para usar o Supabase (ou outro Postgres), preencha `DATABASE_URL`: veja [Banco no Supabase](#banco-no-supabase). Para zerar os dados, apague essa pasta com o backend parado.
+
+## Tempo real (WebSocket)
+
+O backend tem um servidor socket.io (`/socket.io`, porta 3333) com dois namespaces:
+
+- **`/chamados`**: o Chamado Pronto. O handshake usa o mesmo cookie de sessão da API; sem sessão, a conexão é recusada. Cada usuário fica na sala `usuario:<id>`, e cada analista também na sala `triagem:<empresa>`.
+- **`/`**: o chat ao vivo entre cliente e atendente (veja `backend/README.md`).
+
+| Evento | Direção | O que faz |
+|---|---|---|
+| `chamado:abrir` `{ texto }` | solicitante → servidor | Abre o chamado; o ack traz o estado quando o agente termina o turno |
+| `chamado:responder` `{ chamadoId, texto }` | solicitante → servidor | Responde à pergunta do agente |
+| `chamado:mensagem` `{ chamadoId, texto }` | solicitante ou atendente → servidor | Depois que o agente conclui: mensagem no chat do chamado, entre o solicitante e o atendente (analista da empresa) |
+| `chamado:agente` | servidor → solicitante | Fase do agente, ao vivo: `pensando`, `consultando` (com a ferramenta), `escrevendo`, `tentando_de_novo`, `concluido` |
+| `chamado:atualizado` | servidor → solicitante | Estado completo do chamado a cada mudança, inclusive mensagem do atendente e decisão da triagem |
+| `triagem:fila` | servidor → analistas | Fila da empresa, já ordenada, quando um chamado entra nela, recebe mensagem ou é triado |
+| `triagem:chamado` | servidor → analistas | Um chamado da fila mudou (inclusive mensagem nova); quem estiver com ele aberto recarrega o detalhe |
+
+Os erros do ack têm o mesmo formato da API REST (`{ erro, mensagem, ... }`); `hub_indisponivel` continua abrindo o formulário curto. A contingência e as decisões da triagem continuam na API REST, e o servidor avisa pelo WebSocket. O domínio publica as mudanças num barramento em memória (`backend/src/dominio/eventos.ts`), e o gateway (`backend/src/tempo-real/gateway.ts`) repassa às salas.
+
+O frontend fala com a API pelo rewrite do Next (`/api`) e abre o WebSocket direto no backend (`NEXT_PUBLIC_API_URL`, ou o mesmo host da página na porta 3333). O cookie de sessão vale nos dois porque cookie não depende da porta.
+
+Teste de ponta a ponta, com o backend rodando no Hub simulado:
+
+```bash
+cd backend
+npm run smoke-chamados
+```
+
+## Ligar no agente real
+
+1. `cd backend` e copie `.env.example` para `.env`.
+2. Preencha `HUB_API_KEY=` com a sua chave. O agente já vem configurado em `HUB_AGENTE_AURORA`.
+3. Reinicie o backend. O terminal deve mostrar `Hub: real (https://belatrix.ai, agente 06aadae6-…)`, e o cabeçalho do app, "Hub: real".
+
+## Contexto no banco
+
+O contexto da empresa (aplicações, filas, categorias e procedimentos) fica no **Postgres do app**. Os CSVs de `dados/aurora/` são só a carga inicial, feita na primeira vez que o backend sobe. Depois disso, quem manda é o banco.
+
+O agente lê esse contexto por um de três caminhos:
+
+| Caminho | Quando serve | Como liberar |
+|---|---|---|
+| **Conector PostgreSQL do Hub** (principal) | Banco no Supabase: o Hub alcança o banco | `npm run acesso-banco -- aurora` |
+| Conector CSV "Catálogo Aurora" (plano B) | Banco local (PGlite): o Hub não alcança | `npm run exportar-catalogo -- aurora` e trocar os arquivos no conector |
+| Conector API REST (`/hub/v1`) | App publicado (D5) | `npm run gerar-token -- aurora` |
+
+### Banco no Supabase
+
+1. Crie um projeto no Supabase, de preferência na região São Paulo, e guarde a senha do banco.
+2. Em **Connect**, copie a URI do **Session pooler**. A conexão direta do plano gratuito é só IPv6, e o Hub pode não alcançá-la.
+3. Em `backend/.env`, preencha `DATABASE_URL` com essa URI, trocando `[YOUR-PASSWORD]` pela senha. Na senha, `@` vira `%40`, `#` vira `%23` e `/` vira `%2F`.
+4. Opcional: baixe o certificado em Database Settings → SSL Configuration e aponte `DATABASE_SSL_CA` para ele. Assim o app verifica o servidor.
+5. Suba o backend. O terminal deve mostrar `banco: postgres (…pooler.supabase.com, …)`. As tabelas e a carga inicial da Aurora são criadas na primeira subida.
+
+O app não usa a Data API do Supabase, que publica o schema `public`. Por isso todas as tabelas ficam com RLS ligado e sem política, e os papéis `anon` e `authenticated` perdem o acesso a elas. Se quiser, desligue a Data API em Project Settings → Data API.
+
+**Plano gratuito:** um projeto parado por 7 dias é pausado. Confira se ele está ativo antes do Gate 3 e da apresentação.
+
+### Acesso do Hub ao banco (conector PostgreSQL)
+
+O agente escreve o SQL, então o Hub **nunca** recebe o usuário `postgres` do app. Cada empresa tem um usuário próprio, só de leitura:
+
+- **schema `hub_aurora`**, com views só da Aurora: `contexto` (uma linha com tudo em JSON), `empresa`, `filas`, `aplicacoes`, `categorias`, `procedimentos` e `chamados_recentes` (os últimos 7 dias, sem quem abriu);
+- **usuário `hub_aurora`**, que só enxerga esse schema: não lê as tabelas do app (chamados, usuários, tokens) nem as de outra empresa, e não escreve em nada. Tem limite de 5 conexões e consultas de até 5 s.
+
+```bash
+npm run acesso-banco -- aurora
+```
+
+O comando cria o schema, as views e o usuário, com uma senha nova, e mostra os campos do conector: host, porta, banco, usuário, senha e schema. **A senha aparece só uma vez.** O banco guarda só o verificador SCRAM, nunca a senha. Em seguida, o comando entra como o Hub, pelo mesmo pooler, e confere que o usuário lê o contexto e que as tabelas do app e a escrita estão bloqueadas.
+
+- Rodar de novo troca a senha. Atualize o conector no Hub.
+- `npm run revogar-acesso-banco -- aurora` bloqueia o usuário e encerra as conexões abertas.
+- As views são recriadas a cada subida do backend, e a senha continua a mesma.
+
+No Hub, crie o conector em **Conectores → Novo conector → Database (PostgreSQL)**. Não use o toolkit "PostgreSQL": ele não tem SSL Mode nem modo só leitura.
+
+| Aba | Campo | Valor |
+|---|---|---|
+| Básico | Nome / Slug | Contexto Aurora / `contexto-aurora` |
+| Destino | Host, Porta, Usuário, Nome do Banco | os do `acesso-banco` (porta 5432, banco `postgres`, usuário `hub_aurora.<ref>`) |
+| Destino | Senha | a do `acesso-banco`, colada pela pessoa |
+| Destino | SSL Mode | Obrigatório |
+| Avançado | Somente leitura | ligado |
+| Recursos | — | só aparece depois de salvar: conferir que lista as views de `hub_aurora` |
+
+No agente, use o prompt `hub/prompt-qualificador-aurora-v4-banco.md`. No primeiro turno, ele lê tudo com `select contexto from hub_aurora.contexto`. Os nomes vão completos porque o conector pode fixar outro `search_path`.
+
+### Conector de API (para quando o app for publicado)
+
+**Ele já está pronto no backend**, na mesma porta do app, em `/hub/v1`, com o OpenAPI em `/hub/v1/openapi.json`. A empresa sai do token, então o agente não consegue pedir dados de outra empresa.
+
+| Operação | Rota | Para quê |
+|---|---|---|
+| `obterContexto` | `GET /hub/v1/contexto` | Tudo da empresa numa chamada (~9 KB) |
+| `obterCategoria` | `GET /hub/v1/categorias/{slug}` | Ficha de uma categoria |
+| `buscarAplicacao` | `GET /hub/v1/aplicacoes?busca=portal` | Resolve nome ou apelido; avisa quando está fora do catálogo |
+| `listarChamadosAbertos` | `GET /hub/v1/chamados-abertos?aplicacao=pagaflow` | Outros chamados recentes da mesma aplicação (abrangência) |
+
+### Testar o conector de API localmente
+
+Com o backend rodando, gere um token e consulte, trocando `<token>` pelo valor gerado:
+
+```bash
+npm run gerar-token -- aurora "teste local"
+```
+
+```bash
+curl -H "Authorization: Bearer <token>" http://localhost:3333/hub/v1/contexto
+```
+
+**Quando o app for publicado (D5),** o conector **API REST** do Hub importa o OpenAPI de `https://<endereço do app>/hub/v1/openapi.json`, com autenticação **Bearer** e um token gerado para ele. Aí o agente troca o conector CSV por esse, com o prompt de `hub/prompt-qualificador-aurora-v3-api.md`.
+
+### Tokens do conector
+
+Cada empresa tem um ou mais tokens, guardados no banco: só o hash e um prefixo para identificar. É o token que diz à API de qual empresa é o pedido. Empresa nova, token novo; nada muda no `.env`.
+
+| Comando | O que faz |
+|---|---|
+| `npm run gerar-token -- <empresa> "descrição"` | Cria um token e mostra o valor uma única vez |
+| `npm run listar-tokens` (ou `-- <empresa>`) | Lista pelo prefixo, com último uso e revogação |
+| `npm run revogar-token -- <id>` | Revoga; vale já na próxima consulta do Hub |
+
+Para trocar um token sem derrubar o conector: gere o novo, atualize no Hub e só então revogue o antigo.
+
+### Administrar o catálogo (com o backend rodando)
+
+```bash
+npm run recarregar-catalogo -- aurora
+```
+Apaga o catálogo da Aurora no banco e recarrega de `dados/aurora/*.csv`.
+
+```bash
+npm run exportar-catalogo -- aurora
+```
+Gera `exportados/aurora/*.csv` a partir do banco. É o plano B, quando o banco é local e o Hub não alcança: no Hub, Conectores → Catálogo Aurora → Editar → Configuração → remova os 4 arquivos, solte os novos, **preencha Row Limit = 100** e salve.
+
+## Testar com o agente real
+
+### 1. Smoke test, sem o app (~1–2 centavos de dólar)
+
+```bash
+cd backend
+npm run smoke-hub
+```
+
+Dois turnos na mesma sessão ("não consigo lançar um pagamento no portal" → "apareceu remessa recusada pelo banco"). O que conferir em cada turno:
+
+| O que aparece | O que significa |
+|---|---|
+| `eventos: session_started, …, content, completed` | O runtime responde em SSE no formato esperado |
+| A mesma `sessão` nos dois turnos | A continuidade de conversa funciona |
+| `ferramentas: …_catalogo_triagem` | O agente consultou o Catálogo Aurora **sem ninguém pedir** |
+| JSON impresso com `status`, `fila_sugerida`, `confianca` | O agente seguiu o contrato |
+| `FORA DO FORMATO` | O agente não respondeu em JSON. O app pede de novo uma vez; se continuar, vira abstenção |
+| `Hub respondeu 401/404/…` | Problema de chave ou de rota. Mande a saída |
+
+### 2. Pelo app
+
+Entre como **Ana** e abra um chamado para cada caso. Depois entre como **Bruna** e revise cada um na triagem.
+
+Envie só o relato. Depois, **responda apenas o que o agente perguntar**, usando a ficha do que o solicitante sabe. Se ele perguntar algo que não está na ficha, responda "não sei". É isso que torna o teste repetível: o agente precisa descobrir o que perguntar.
+
+| # | Relato | O que o solicitante sabe | Esperado |
+|---|---|---|---|
+| 1 | "Não consigo pagar o fornecedor pelo portal" | Aparece "Remessa recusada pelo banco". Só com esse fornecedor; outros pagamentos saem. Só com ele? Não sabe | 1 pergunta → **Operações Financeiras** |
+| 2 | "O portal de pagamentos travou quando cliquei em enviar remessa" | A tela congela e fecha sozinha, sem mensagem. Aconteceu duas vezes hoje. Se colegas têm o problema: não sabe | 0–1 pergunta → **Aplicações Corporativas** |
+| 3 | "Não consigo abrir o módulo de aprovação do DespesaCerta" | Aparece "Você não tem permissão para acessar este módulo". Nunca usou: foi promovida a coordenadora esta semana. O gestor consegue | 2 perguntas (o que aparece; se já funcionou ou se colegas conseguem) → **Identidade e Acessos** |
+| 4 | "O sistema está fora" | Não sabe qual sistema nem se é com outros: responde "não sei" a tudo | **Abstenção**, com a dúvida escrita |
+| 5 | "O SAP não abre" | Acessa por um link interno no navegador; tentava lançar uma nota | **Abstenção**: aplicação fora do catálogo |
+| 6 | "Acho que alguém entrou na minha conta e mudou meus dados bancários" | Recebeu um e-mail de alteração que não fez | **Segurança**: encerra e orienta, sem perguntas |
+
+Em cada caso, na tela da Bruna, anote:
+- quantas perguntas o agente fez;
+- a fila sugerida e a confiança;
+- se aparecem **consultas do agente ao catálogo**;
+- a lista **"O que o app ajustou"**, que mostra quando o app corrigiu o agente.
+
+A conversa completa, os tokens e o tempo ficam no fim do detalhe. No Hub, as sessões aparecem em **Monitorar → Sessões**.
+
+**Se algo falhar:** copie o que apareceu no terminal do backend e a lista "O que o app ajustou".
+
+### 3. Caminhos de erro (funcionam com o Hub simulado)
+
+Com o Hub simulado, estas palavras no relato disparam as falhas:
+- `#hub-fora`: o assistente fica indisponível e aparece o formulário curto (contingência);
+- `#json-ruim`: o agente responde fora do formato, e o app tenta de novo;
+- `#tool-erro`: a consulta ao catálogo falha, e o app força a abstenção.
+
+## O que o app garante por cima do agente
+
+Estas regras ficam em `backend/src/dominio/contrato.ts`, com testes em `npm test`:
+
+- no máximo 3 perguntas; na 4ª, o app encerra e manda para triagem humana;
+- discriminador sem resposta limita a confiança a 0,6;
+- confiança abaixo de 0,7 vira abstenção;
+- fila fora do catálogo vira abstenção;
+- consulta ao catálogo que falhou e não foi refeita vira abstenção;
+- resposta fora do formato: uma nova tentativa e, se falhar de novo, triagem humana;
+- Hub indisponível: formulário curto, e o chamado não se perde;
+- a empresa sai sempre do usuário logado, e cada solicitante só vê os próprios chamados.
+
+## Limitações do protótipo
+
+- Login sem senha: escolha de usuário de teste.
+- Uma empresa só (Aurora). As tabelas já separam por empresa.
+- O texto do agente aparece inteiro ao final do turno, não aos poucos: ele responde em JSON, que só vale depois de validado. O que chega ao vivo é a fase do agente.
+- O barramento de eventos e o chat ao vivo ficam em memória: com mais de uma instância do backend, seria preciso um adapter do socket.io (Redis, por exemplo).
+- Sem precedentes nem medição (semana 3, no plano técnico).

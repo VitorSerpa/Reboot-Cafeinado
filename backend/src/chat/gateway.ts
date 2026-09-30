@@ -1,8 +1,6 @@
-import type { Server as HttpServer } from "node:http";
+import type { Namespace, Server, Socket } from "socket.io";
 
-import { Server, type Socket } from "socket.io";
-
-import { env } from "../env.js";
+import { env } from "../config/env.js";
 import * as store from "./store.js";
 import {
   MAX_MESSAGE_LENGTH,
@@ -14,6 +12,7 @@ import {
 } from "./types.js";
 
 type ChatSocket = Socket<ClientToServerEvents, ServerToClientEvents, never, SocketData>;
+type ChatNamespace = Namespace<ClientToServerEvents, ServerToClientEvents, never, SocketData>;
 
 const SUPPORT_ROOM = "support";
 const conversationRoom = (id: string) => `conv:${id}`;
@@ -34,14 +33,9 @@ function canAccess(socket: ChatSocket, conversationId: string): boolean {
   return socket.data.role === "client" && socket.data.conversationId === conversationId;
 }
 
-export function createChatGateway(httpServer: HttpServer) {
-  const io = new Server<ClientToServerEvents, ServerToClientEvents, never, SocketData>(
-    httpServer,
-    {
-      path: "/socket.io",
-      cors: { origin: env.corsOrigin },
-    },
-  );
+/** Chat ao vivo entre cliente e atendente, no namespace padrão (`/`) do socket.io. */
+export function createChatGateway(server: Server) {
+  const io = server.of("/") as unknown as ChatNamespace;
 
   const notifySupport = (
     event: "conversation:created" | "conversation:updated",

@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
 
 export function notFound(req: Request, res: Response) {
-  res.status(404).json({ error: `Rota não encontrada: ${req.method} ${req.originalUrl}` });
+  res.status(404).json({ erro: "rota", mensagem: `Rota não encontrada: ${req.method} ${req.originalUrl}` });
 }

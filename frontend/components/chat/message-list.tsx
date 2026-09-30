@@ -21,7 +21,7 @@ export function MessageList({ messages, viewerRole, emptyHint }: MessageListProp
 
   if (messages.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-zinc-500">
+      <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-cinza">
         {emptyHint ?? "Nenhuma mensagem ainda."}
       </div>
     );
@@ -32,7 +32,7 @@ export function MessageList({ messages, viewerRole, emptyHint }: MessageListProp
       {messages.map((message) => {
         if (message.from === "system") {
           return (
-            <p key={message.id} className="text-center text-xs text-zinc-500">
+            <p key={message.id} className="text-center text-xs text-cinza">
               {message.body}
             </p>
           );
@@ -45,8 +45,8 @@ export function MessageList({ messages, viewerRole, emptyHint }: MessageListProp
             <div
               className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
                 isMine
-                  ? "bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900"
-                  : "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
+                  ? "rounded-br-sm bg-soft-black text-white"
+                  : "rounded-bl-sm bg-bolha-agente text-soft-black"
               }`}
             >
               <span className="mb-0.5 block text-[11px] opacity-60">

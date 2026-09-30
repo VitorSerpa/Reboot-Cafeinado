@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { Cabecalho } from "@/components/Cabecalho";
 import { Composer } from "@/components/chat/composer";
 import { MessageList } from "@/components/chat/message-list";
 import { createChatSocket, request, type ChatSocket } from "@/lib/chat/socket";
@@ -69,7 +70,10 @@ export default function ClientChatPage() {
         try {
           localStorage.setItem(
             STORAGE_KEY,
-            JSON.stringify({ name: identity.current.name, conversationId: conv.id } satisfies Stored),
+            JSON.stringify({
+              name: identity.current.name,
+              conversationId: conv.id,
+            } satisfies Stored),
           );
         } catch {
           // localStorage indisponível (aba privada): segue sem retomar depois.
@@ -159,114 +163,115 @@ export default function ClientChatPage() {
 
   if (!conversation) {
     return (
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 px-4 py-12">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Falar com o suporte</h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Abrimos um atendimento em tempo real com um de nossos atendentes.
-          </p>
-        </div>
+      <>
+        <Cabecalho
+          usuario={null}
+          produto="Suporte ao vivo"
+          conectado={socket ? connected : undefined}
+        />
+        <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6 px-4 py-12">
+          <div>
+            <h1 className="titulo">Falar com o suporte</h1>
+            <p className="mt-1 text-sm text-cinza">
+              Abrimos um atendimento em tempo real com um de nossos atendentes.
+            </p>
+          </div>
 
-        <form onSubmit={handleStart} className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm">
-            Seu nome
-            <input
-              ref={nameInputRef}
-              name="name"
-              defaultValue=""
-              maxLength={80}
-              className="rounded-lg border border-zinc-300 bg-transparent px-3 py-2 outline-none focus:border-zinc-500 dark:border-zinc-700"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Assunto <span className="text-zinc-500">(opcional)</span>
-            <input
-              name="subject"
-              defaultValue=""
-              maxLength={120}
-              placeholder="Ex.: pedido atrasado"
-              className="rounded-lg border border-zinc-300 bg-transparent px-3 py-2 outline-none focus:border-zinc-500 dark:border-zinc-700"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={Boolean(socket) && !error}
-            className="mt-2 h-11 rounded-lg bg-zinc-900 text-sm font-medium text-zinc-50 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
-          >
-            {socket && !error ? "Conectando…" : "Iniciar atendimento"}
-          </button>
-        </form>
+          <form onSubmit={handleStart} className="flex flex-col gap-3">
+            <label className="flex flex-col gap-1 text-sm">
+              Seu nome
+              <input
+                ref={nameInputRef}
+                name="name"
+                defaultValue=""
+                maxLength={80}
+                className="campo"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              Assunto <span className="text-cinza">(opcional)</span>
+              <input
+                name="subject"
+                defaultValue=""
+                maxLength={120}
+                placeholder="Ex.: pedido atrasado"
+                className="campo"
+              />
+            </label>
+            <button type="submit" disabled={Boolean(socket) && !error} className="botao mt-2">
+              {socket && !error ? "Conectando…" : "Iniciar atendimento"}
+            </button>
+          </form>
 
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-      </main>
+          {error && <p className="aviso erro">{error}</p>}
+        </main>
+      </>
     );
   }
 
   const closed = conversation.status === "closed";
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-6">
-      <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-800">
-        <header className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-          <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold">Suporte · {conversation.subject}</h1>
-            <p className="text-xs text-zinc-500">
-              {closed
-                ? "Atendimento encerrado"
-                : supportOnline
-                  ? "Atendente na conversa"
-                  : "Aguardando um atendente"}
-            </p>
-          </div>
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${
-              connected
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-            }`}
-          >
-            {connected ? "online" : "reconectando…"}
-          </span>
-        </header>
+    <>
+      <Cabecalho
+        usuario={null}
+        produto="Suporte ao vivo"
+        conectado={socket ? connected : undefined}
+      />
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-6">
+        <div className="flex flex-1 flex-col overflow-hidden rounded-[10px] bg-white shadow-cartao">
+          <header className="flex items-center justify-between gap-3 border-b border-cinza-claro px-4 py-3">
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-semibold">Suporte · {conversation.subject}</h1>
+              <p className="text-xs text-cinza">
+                {closed
+                  ? "Atendimento encerrado"
+                  : supportOnline
+                    ? "Atendente na conversa"
+                    : "Aguardando um atendente"}
+              </p>
+            </div>
+            <span className={`shrink-0 ${connected ? "selo verde" : "selo laranja"}`}>
+              {connected ? "online" : "reconectando…"}
+            </span>
+          </header>
 
-        <MessageList
-          messages={messages}
-          viewerRole="client"
-          emptyHint="Conte o que aconteceu — um atendente responde por aqui."
-        />
-
-        {supportTyping && !closed && (
-          <p className="px-4 pb-1 text-xs text-zinc-500">o atendente está digitando…</p>
-        )}
-        {error && <p className="px-4 pb-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
-
-        {closed ? (
-          <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
-            <button
-              onClick={handleNewConversation}
-              className="h-10 w-full rounded-lg border border-zinc-300 text-sm font-medium dark:border-zinc-700"
-            >
-              Abrir novo atendimento
-            </button>
-          </div>
-        ) : (
-          <Composer
-            disabled={!connected}
-            onTypingChange={(isTyping) =>
-              socket?.emit("typing:set", { conversationId: conversation.id, isTyping })
-            }
-            onSend={async (body) => {
-              if (!socket) return;
-              try {
-                await request(socket, "message:send", { conversationId: conversation.id, body });
-                setError(null);
-              } catch (err) {
-                setError(err instanceof Error ? err.message : "Não foi possível enviar");
-              }
-            }}
+          <MessageList
+            messages={messages}
+            viewerRole="client"
+            emptyHint="Conte o que aconteceu — um atendente responde por aqui."
           />
-        )}
-      </div>
-    </main>
+
+          {supportTyping && !closed && (
+            <p className="px-4 pb-1 text-xs text-cinza">o atendente está digitando…</p>
+          )}
+          {error && <p className="px-4 pb-1 text-xs text-vermelho">{error}</p>}
+
+          {closed ? (
+            <div className="border-t border-cinza-claro p-3">
+              <button onClick={handleNewConversation} className="botao secundario h-10 w-full">
+                Abrir novo atendimento
+              </button>
+            </div>
+          ) : (
+            <Composer
+              disabled={!connected}
+              onTypingChange={(isTyping) =>
+                socket?.emit("typing:set", { conversationId: conversation.id, isTyping })
+              }
+              onSend={async (body) => {
+                if (!socket) return;
+                try {
+                  await request(socket, "message:send", { conversationId: conversation.id, body });
+                  setError(null);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Não foi possível enviar");
+                }
+              }}
+            />
+          )}
+        </div>
+      </main>
+    </>
   );
 }

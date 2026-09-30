@@ -1,5 +1,7 @@
 import { io, type Socket } from "socket.io-client";
 
+import { urlDoBackend } from "@/lib/backend";
+
 import type {
   AckResult,
   ClientToServerEvents,
@@ -11,10 +13,8 @@ import type {
 
 export type ChatSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
-
 export function createChatSocket(): ChatSocket {
-  return io(SOCKET_URL, { transports: ["websocket"] });
+  return io(urlDoBackend(), { transports: ["websocket"] });
 }
 
 /** Eventos com ack: `[payload, resposta]`. */

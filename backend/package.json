@@ -9,18 +9,35 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "smoke": "node scripts/smoke-chat.mjs"
+    "test": "tsx --test src/**/*.test.ts",
+    "smoke": "node scripts/smoke-chat.mjs",
+    "smoke-chamados": "node scripts/smoke-chamados.mjs",
+    "smoke-hub": "tsx scripts/smoke-hub.ts",
+    "gerar-token": "tsx scripts/admin.ts gerar-token",
+    "listar-tokens": "tsx scripts/admin.ts listar-tokens",
+    "revogar-token": "tsx scripts/admin.ts revogar-token",
+    "recarregar-catalogo": "tsx scripts/admin.ts recarregar",
+    "exportar-catalogo": "tsx scripts/admin.ts exportar",
+    "acesso-banco": "tsx scripts/admin.ts acesso-banco",
+    "revogar-acesso-banco": "tsx scripts/admin.ts revogar-acesso-banco",
+    "diagnosticar-banco": "tsx scripts/admin.ts diagnosticar-banco"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "socket.io": "^4.8.3"
+    "pg": "^8.16.3",
+    "socket.io": "^4.8.3",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.9",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
-    "@types/node": "^20",
+    "@types/node": "^22",
+    "@types/pg": "^8.15.5",
     "socket.io-client": "^4.8.3",
     "tsx": "^4.20.6",
     "typescript": "^5"
