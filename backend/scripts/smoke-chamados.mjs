@@ -25,7 +25,20 @@ async function api(rota, { cookie, corpo } = {}) {
   return { json, cookie: resposta.headers.get("set-cookie")?.split(";")[0] };
 }
 
-const entrar = async (usuario) => (await api("/auth/entrar", { corpo: { usuarioId: usuario.id } })).cookie;
+/** Usuários só do smoke (a senha deles é trocada a cada execução; a dos usuários de verdade nunca). */
+async function criarUsuario(id, nome, perfil) {
+  const resposta = await fetch(`${URL}/api/admin/usuarios`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, nome, perfil }),
+  });
+  const json = await resposta.json();
+  if (!resposta.ok) throw new Error(`criar ${id}: ${json.mensagem}`);
+  return json;
+}
+
+const entrar = async (login) =>
+  (await api("/auth/entrar", { corpo: { email: login.email, senha: login.senha, perfil: login.perfil } })).cookie;
 
 const conectar = (cookie) =>
   io(`${URL}/chamados`, { transports: ["websocket"], extraHeaders: cookie ? { cookie } : {} });
@@ -57,10 +70,20 @@ try {
   const status = (await api("/status")).json;
   assert(status.hub === "simulado", "backend no Hub simulado (respostas previsíveis)");
 
-  const usuarios = (await api("/auth/usuarios")).json;
-  const [ana, carlos] = usuarios.filter((u) => u.perfil === "solicitante");
-  const bruna = usuarios.find((u) => u.perfil === "analista");
+  const ana = await criarUsuario("smoke-solicitante", "Smoke Solicitante", "solicitante");
+  const carlos = await criarUsuario("smoke-intruso", "Smoke Intruso", "solicitante");
+  const bruna = await criarUsuario("smoke-analista", "Smoke Analista", "analista");
+
+  let recusado = null;
+  await api("/auth/entrar", { corpo: { email: ana.email, senha: "senha-errada-123" } }).catch((e) => (recusado = e.message));
+  assert(/incorretos/.test(recusado ?? ""), "senha errada não entra");
+
+  let tipoErrado = null;
+  await api("/auth/entrar", { corpo: { email: ana.email, senha: ana.senha, perfil: "analista" } }).catch((e) => (tipoErrado = e.message));
+  assert(/login é de solicitante/.test(tipoErrado ?? ""), "solicitante não entra pelo login do suporte");
+
   const [cookieAna, cookieCarlos, cookieBruna] = await Promise.all([entrar(ana), entrar(carlos), entrar(bruna)]);
+  assert(cookieAna && cookieCarlos && cookieBruna, "e-mail e senha certos entram (cookie de sessão)");
 
   const anonimo = conectar(null);
   sockets.push(anonimo);

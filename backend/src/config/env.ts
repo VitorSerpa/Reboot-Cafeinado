@@ -17,8 +17,6 @@ export const env = {
     .map((origem) => origem.trim())
     .filter(Boolean),
   sessionSecret: vazio(process.env.SESSION_SECRET) || "dev-somente-local",
-  /** Segredo compartilhado do painel de suporte (chat ao vivo) — placeholder até existir autenticação real. */
-  supportToken: vazio(process.env.SUPPORT_TOKEN) || "suporte-dev",
 
   db: {
     url: vazio(process.env.DATABASE_URL),
@@ -32,7 +30,7 @@ export const env = {
     modo: (hubModeExplicito || (hubApiKey ? "real" : "simulado")) as "real" | "simulado",
     baseUrl: (vazio(process.env.HUB_BASE_URL) || "https://belatrix.ai").replace(/\/+$/, ""),
     apiKey: hubApiKey,
-    agenteAurora: vazio(process.env.HUB_AGENTE_AURORA) || "06aadae6-b808-72cb-8000-b3f61092c8e8",
+    agenteAurora: vazio(process.env.HUB_AGENTE_AURORA) || "06abc3a3-1c9f-785e-8000-519434bce89a",
     timeoutMs: Number(vazio(process.env.HUB_TIMEOUT_MS) || 90000),
   },
 };

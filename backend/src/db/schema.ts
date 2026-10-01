@@ -14,6 +14,28 @@ create table if not exists usuarios (
   perfil      text not null check (perfil in ('solicitante', 'analista'))
 );
 
+-- Login do usuário (perfil solicitante ou analista, o "suporte"): e-mail e senha na própria tabela.
+-- Guarda só o hash (scrypt, com sal próprio); a senha aparece uma vez, ao definir. Sem senha, não entra.
+-- Depois de 5 erros seguidos, o login fica bloqueado por 15 minutos.
+alter table usuarios add column if not exists email             text;
+alter table usuarios add column if not exists senha_hash        text;
+alter table usuarios add column if not exists tentativas_falhas int not null default 0;
+alter table usuarios add column if not exists bloqueado_ate     timestamptz;
+alter table usuarios add column if not exists ultimo_login      timestamptz;
+alter table usuarios add column if not exists senha_definida_em timestamptz;
+create unique index if not exists usuarios_email_unico on usuarios (lower(email));
+
+-- A primeira versão do login usava uma tabela à parte (autenticacao): traz o que houver e apaga a tabela.
+do $$
+begin
+  if to_regclass('public.autenticacao') is not null then
+    update usuarios u set email = a.email, senha_hash = a.senha_hash, tentativas_falhas = a.tentativas_falhas,
+           bloqueado_ate = a.bloqueado_ate, ultimo_login = a.ultimo_login, senha_definida_em = a.senha_definida_em
+    from autenticacao a where a.usuario_id = u.id and u.senha_hash is null;
+    drop table autenticacao;
+  end if;
+end $$;
+
 create table if not exists filas (
   empresa_id  text not null references empresas(id),
   slug        text not null,

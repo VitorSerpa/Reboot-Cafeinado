@@ -37,7 +37,7 @@ const maisNovo = (atual: EstadoChamado | null, chegou: EstadoChamado) =>
 
 export default function AbrirChamado() {
   const usuario = useSessao("solicitante");
-  const { socket, conectado } = useTempoReal(!!usuario);
+  const { socket, conectado } = useTempoReal(usuario?.id ?? null);
   const [estado, setEstado] = useState<EstadoChamado | null>(null);
   const [texto, setTexto] = useState("");
   const [pendente, setPendente] = useState<string | null>(null);

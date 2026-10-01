@@ -5,6 +5,16 @@ import { aplicarRegras, lerContrato, MENSAGEM_PRONTO, type Contrato } from "./co
 
 const FILAS = ["aplicacoes-corporativas", "identidade-acessos", "infra-conectividade", "operacoes-financeiras"];
 
+/** Uma leitura do contexto que deu certo (o conector PostgreSQL do Hub). */
+const CONSULTOU = {
+  tool: "postgres_aurora_query",
+  arguments: { sql: "select contexto from hub_aurora.contexto" },
+  result: "[...]",
+  status: "completed",
+  isError: false,
+  latencyMs: 30,
+};
+
 function contrato(parcial: Partial<Contrato>): Contrato {
   const lido = lerContrato(JSON.stringify({ mensagem_ao_usuario: "ok", status: "pronto", ...parcial }));
   assert.ok(lido.ok);
@@ -23,14 +33,24 @@ test("recusa resposta fora do formato", () => {
   assert.equal(lerContrato('{"status":"talvez"}').ok, false);
 });
 
-test("pronto com confiança alta e fila válida passa sem ajuste", () => {
+test("pronto com confiança alta, fila válida e catálogo consultado passa sem ajuste", () => {
+  const r = aplicarRegras(contrato({ fila_sugerida: "operacoes-financeiras", confianca: 0.9 }), {
+    perguntasAntes: 1,
+    toolCalls: [CONSULTOU],
+    filasValidas: FILAS,
+  });
+  assert.equal(r.contrato.status, "pronto");
+  assert.deepEqual(r.ajustes, []);
+});
+
+test("pronto sem nenhuma consulta ao catálogo vira abstenção (fila adivinhada)", () => {
   const r = aplicarRegras(contrato({ fila_sugerida: "operacoes-financeiras", confianca: 0.9 }), {
     perguntasAntes: 1,
     toolCalls: [],
     filasValidas: FILAS,
   });
-  assert.equal(r.contrato.status, "pronto");
-  assert.deepEqual(r.ajustes, []);
+  assert.equal(r.contrato.status, "abstencao");
+  assert.match(r.ajustes[0], /não consultou o catálogo/);
 });
 
 test("discriminador sem resposta limita a confiança e leva à abstenção", () => {
@@ -77,7 +97,7 @@ test("falha de consulta num turno anterior ainda conta, a menos que a consulta t
 });
 
 test("mensagem final nunca revela a fila; o ajuste só aparece quando revelava", () => {
-  const base = { perguntasAntes: 1, toolCalls: [], filasValidas: FILAS, nomesFilas: [...FILAS, "Operações Financeiras"] };
+  const base = { perguntasAntes: 1, toolCalls: [CONSULTOU], filasValidas: FILAS, nomesFilas: [...FILAS, "Operações Financeiras"] };
   const revelando = aplicarRegras(
     contrato({ fila_sugerida: "operacoes-financeiras", confianca: 0.9, mensagem_ao_usuario: "Vamos encaminhar para a equipe de Operações Financeiras." }),
     base,
@@ -94,7 +114,7 @@ test("falha de ferramenta de memória não derruba a sugestão", () => {
   const memoria = { tool: "log_decision", arguments: {}, result: "erro", status: "error", isError: true, latencyMs: 1 };
   const r = aplicarRegras(contrato({ fila_sugerida: "aplicacoes-corporativas", confianca: 0.9 }), {
     perguntasAntes: 1,
-    toolCalls: [memoria],
+    toolCalls: [CONSULTOU, memoria],
     filasValidas: FILAS,
   });
   assert.equal(r.contrato.status, "pronto");

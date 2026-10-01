@@ -1,3 +1,5 @@
+import { tokenDaAba } from "@/lib/sessao";
+
 /** Chamada ao backend pelo mesmo domínio (/api é repassado pelo Next ao Express). */
 export class ErroApi extends Error {
   constructor(
@@ -12,10 +14,15 @@ export class ErroApi extends Error {
 
 export async function api<T>(rota: string, opcoes: { metodo?: string; corpo?: unknown } = {}): Promise<T> {
   let resposta: Response;
+  const token = tokenDaAba();
+  const headers: Record<string, string> = {};
+  if (opcoes.corpo !== undefined) headers["Content-Type"] = "application/json";
+  // A sessão desta aba vem antes do cookie (que é compartilhado por todas as abas).
+  if (token) headers["x-sessao"] = token;
   try {
     resposta = await fetch(`/api${rota}`, {
       method: opcoes.metodo ?? (opcoes.corpo === undefined ? "GET" : "POST"),
-      headers: opcoes.corpo === undefined ? undefined : { "Content-Type": "application/json" },
+      headers,
       body: opcoes.corpo === undefined ? undefined : JSON.stringify(opcoes.corpo),
       credentials: "same-origin",
     });
@@ -37,6 +44,8 @@ export interface Usuario {
   empresa_id: string;
   empresa_nome?: string;
   hub?: "real" | "simulado";
+  /** Token de sessão da aba, devolvido por /auth/entrar e /auth/me. */
+  token?: string;
 }
 
 export interface ToolCall {

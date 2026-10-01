@@ -6,7 +6,7 @@ import * as chamados from "../dominio/chamados.js";
 import { ErroApp } from "../dominio/erros.js";
 import { eventos } from "../dominio/eventos.js";
 import * as triagem from "../dominio/triagem.js";
-import { buscarUsuario, COOKIE_SESSAO } from "../dominio/usuarios.js";
+import { buscarUsuario, COOKIE_SESSAO, idDoToken } from "../dominio/usuarios.js";
 import type { Ack, ClienteParaServidor, DadosSocket, EstadoChamado, ServidorParaCliente } from "./tipos.js";
 
 type NamespaceChamados = Namespace<ClienteParaServidor, ServidorParaCliente, never, DadosSocket>;
@@ -57,7 +57,10 @@ export function criarGatewayChamados(io: Server) {
 
   nsp.use(async (socket, next) => {
     try {
-      const id = idDoCookie(socket.handshake.headers.cookie);
+      // O token da aba vem antes do cookie: o cookie é um só por navegador, e a reconexão da triagem chegaria
+      // como o solicitante que entrou em outra aba (sem a sala da fila, a tela parava de atualizar).
+      const token = socket.handshake.auth?.token;
+      const id = token ? idDoToken(token) : idDoCookie(socket.handshake.headers.cookie);
       const usuario = id ? await buscarUsuario(id) : undefined;
       if (!usuario) return next(new Error("sem_sessao"));
       socket.data.usuario = usuario;

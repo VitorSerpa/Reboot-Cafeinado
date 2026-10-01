@@ -117,7 +117,14 @@ test("SSL: Supabase cifra sempre, localhost não, e a URL não sobrescreve a con
 });
 
 test("ferramentas do conector PostgreSQL contam como consulta ao catálogo", () => {
-  for (const nome of ["run_query", "run_query_contexto_aurora", "show_tables_contexto_aurora", "describe_table", "inspect_query_x"]) {
+  for (const nome of [
+    "run_query",
+    "run_query_contexto_aurora",
+    "show_tables_contexto_aurora",
+    "describe_table",
+    "inspect_query_x",
+    "postgres_aurora_query",
+  ]) {
     assert.ok(eFerramentaDeCatalogo(nome), nome);
   }
   assert.equal(eFerramentaDeCatalogo("run_queryx"), false);

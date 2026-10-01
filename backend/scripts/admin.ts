@@ -10,10 +10,20 @@
  *   npm run acesso-banco -- aurora                → usuário só leitura do Hub no banco (senha nova, mostrada UMA vez)
  *   npm run diagnosticar-banco -- aurora          → diagnóstico sem segredo (conexão, papel, login de teste descartável)
  *   npm run revogar-acesso-banco -- aurora        → bloqueia esse usuário
+ *   npm run listar-usuarios                       → quem pode entrar (e-mail, último login, bloqueio), sem segredo
+ *   npm run definir-senha -- <usuário> [e-mail]   → senha nova para o login do app (mostrada UMA vez)
+ *   npm run criar-usuario -- <id> "<Nome>" <solicitante|analista> [e-mail]  → usuário novo na Aurora, já com senha
  */
 import { env } from "../src/config/env.js";
 
-const [comando, arg, descricao] = process.argv.slice(2);
+const [comando, arg, descricao, ...resto] = process.argv.slice(2);
+
+function mostrarLogin(l: { usuario: string; nome: string; perfil: string; email: string; senha: string }) {
+  console.log(`Login de ${l.nome} (${l.usuario}, ${l.perfil}). Copie a senha agora: ela não aparece de novo.\n`);
+  console.log(`  E-mail: ${l.email}`);
+  console.log(`  Senha:  ${l.senha}\n`);
+  console.log("Para trocar depois: npm run definir-senha -- " + l.usuario);
+}
 const base = `http://localhost:${env.port}/api/admin`;
 
 async function chamar(metodo: "GET" | "POST", rota: string, corpo?: unknown) {
@@ -88,8 +98,32 @@ try {
       console.log(`Acesso ${r.papel} bloqueado (${r.conexoes_encerradas} conexão(ões) encerrada(s)). Para liberar de novo: npm run acesso-banco -- ${r.empresa}`);
       break;
     }
+    case "listar-usuarios": {
+      const lista = await chamar("GET", "/usuarios");
+      for (const u of lista) {
+        const login = u.email
+          ? `${u.email}${u.bloqueado ? "  BLOQUEADO" : ""}  · último login: ${u.ultimo_login ?? "nunca"}`
+          : `sem senha: npm run definir-senha -- ${u.id}`;
+        console.log(`${u.id.padEnd(12)} ${u.perfil.padEnd(12)} ${u.nome.padEnd(20)} ${login}`);
+      }
+      break;
+    }
+    case "definir-senha": {
+      if (!arg) throw new Error("Informe o usuário (veja em npm run listar-usuarios).");
+      mostrarLogin(await chamar("POST", `/usuarios/${encodeURIComponent(arg)}/senha`, { email: descricao }));
+      break;
+    }
+    case "criar-usuario": {
+      const [perfil, email] = resto;
+      if (!arg || !descricao || !perfil) throw new Error('Uso: npm run criar-usuario -- <id> "<Nome>" <solicitante|analista> [e-mail]');
+      mostrarLogin(await chamar("POST", "/usuarios", { id: arg, nome: descricao, perfil, email }));
+      break;
+    }
     default:
-      console.error("Comandos: gerar-token, listar-tokens, revogar-token, recarregar, exportar, acesso-banco, diagnosticar-banco, revogar-acesso-banco");
+      console.error(
+        "Comandos: gerar-token, listar-tokens, revogar-token, recarregar, exportar, acesso-banco, diagnosticar-banco, revogar-acesso-banco, " +
+          "listar-usuarios, definir-senha, criar-usuario",
+      );
       process.exit(1);
   }
 } catch (erro) {

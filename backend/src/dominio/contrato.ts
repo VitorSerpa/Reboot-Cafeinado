@@ -9,11 +9,13 @@ export const MENSAGEM_PRONTO =
  * Ferramentas que consultam o contexto da empresa:
  * - conector CSV: `list_files_<slug>`, `describe_file_<slug>`, `query_file_<slug>`, `read_file_<slug>`;
  * - conector PostgreSQL (Agno): `show_tables`, `describe_table`, `summarize_table`, `inspect_query`, `run_query`, com ou sem `_<slug>`;
+ * - conector Database do Hub: `postgres_<slug>_<operação>` (ex.: `postgres_aurora_query`);
  * - conector API REST do backend: as operações do OpenAPI (`obterContexto` etc.), com ou sem prefixo, em camelCase ou snake_case.
  */
 export const eFerramentaDeCatalogo = (nome: string) =>
   /^(list_files|describe_file|query_file|read_file)_/.test(nome) ||
   /^(show_tables|describe_table|summarize_table|inspect_query|run_query)(_|$)/.test(nome) ||
+  /^postgres_[a-z0-9_]+$/.test(nome) ||
   /(obter_?contexto|obter_?categoria|buscar_?aplicacao|listar_?chamados_?abertos)/i.test(nome);
 
 const normalizar = (s: string) =>
@@ -122,6 +124,14 @@ export function aplicarRegras(original: Contrato, ctx: ContextoRegras): { contra
   const falhas = [...ultimaPorFerramenta.values()].filter((t) => t.isError).map((t) => t.tool);
   if (falhas.length > 0 && (c.status === "pronto" || c.status === "abstencao")) {
     abster(`Consulta ao catálogo falhou (${falhas.join(", ")}) e não foi refeita com sucesso; a sugestão não foi confirmada no catálogo.`);
+  }
+
+  // Sem nenhuma consulta ao catálogo que deu certo, a fila foi adivinhada: o agente não leu filas nem regras.
+  if (c.status === "pronto" && !ctx.toolCalls.some((t) => eFerramentaDeCatalogo(t.tool) && !t.isError)) {
+    abster(
+      "O agente não consultou o catálogo (nenhuma ferramenta do catálogo neste chamado); a sugestão não foi confirmada.",
+      "O agente sugeriu a fila sem consultar o catálogo. Confira se o conector do contexto está ligado ao agente no Hub.",
+    );
   }
 
   // O solicitante nunca fica sabendo a fila antes da confirmação do analista.

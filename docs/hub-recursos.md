@@ -2,7 +2,8 @@
 
 | Recurso | ID | Estado em 28/09/2026 |
 |---|---|---|
-| Agente **Qualificador Aurora** (slug `teste`) | `06aadae6-b808-72cb-8000-b3f61092c8e8` | v6. Haiku 4.5, temperature 0,2, max tokens 4096, markdown ligado. Prompt inline v2 = `hub/prompt-qualificador-aurora.md`. Conector: Catálogo Aurora. **Aprendizado desligado** |
+| Agente **Qualificador Aurora**, o que o app chama (`HUB_AGENTE_AURORA`) | `06abc3a3-1c9f-785e-8000-519434bce89a` | Desde 01/10. Conector: Postgres Aurora (banco no Supabase, usuário `hub_aurora`). Prompt: `hub/prompt-qualificador-aurora-v4-banco.md` |
+| Agente antigo (slug `teste`), sem uso | `06aadae6-b808-72cb-8000-b3f61092c8e8` | v6. Haiku 4.5, temperature 0,2, max tokens 4096, markdown ligado. Prompt inline v2 = `hub/prompt-qualificador-aurora.md`. Conector: Catálogo Aurora (CSV). **Aprendizado desligado** |
 | Conector **Catálogo Aurora** (slug `catalogo-triagem`, toolkit CSV) | `06ab3f2e-643d-7959-8000-f4ed434d24e4` | 4 arquivos de `dados/aurora/`: aplicacoes, categorias, filas, procedimentos (só Aurora, sem coluna tenant). `row_limit` = 100 |
 
 ## Histórico

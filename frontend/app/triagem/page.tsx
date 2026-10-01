@@ -34,10 +34,14 @@ interface Detalhe {
   triagem: { fila_final: string; corrigiu: boolean; motivo: string | null; criado_em: string } | null;
 }
 
-/** Ferramentas que consultam o contexto: conector CSV (`read_file_…`), conector PostgreSQL (`run_query_…`) ou API do backend (`obterContexto`). */
+/**
+ * Ferramentas que consultam o contexto: conector CSV (`read_file_…`), conector PostgreSQL (`run_query_…`, `postgres_aurora_query`)
+ * ou API do backend (`obterContexto`). Mesma regra de `eFerramentaDeCatalogo` em `backend/src/dominio/contrato.ts`.
+ */
 const eCatalogo = (nome: string) =>
   /^(list_files|describe_file|query_file|read_file)_/.test(nome) ||
   /^(show_tables|describe_table|summarize_table|inspect_query|run_query)(_|$)/.test(nome) ||
+  /^postgres_[a-z0-9_]+$/.test(nome) ||
   /(obter_?contexto|obter_?categoria|buscar_?aplicacao|listar_?chamados_?abertos)/i.test(nome);
 
 const hora = (iso: string | null) => (iso ? new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
@@ -83,7 +87,7 @@ function SeloSituacao({ item }: { item: Pick<ItemFila, "status" | "resultado_sta
 
 export default function Triagem() {
   const usuario = useSessao("analista");
-  const { socket, conectado } = useTempoReal(!!usuario);
+  const { socket, conectado } = useTempoReal(usuario?.id ?? null);
   const [fila, setFila] = useState<ItemFila[]>([]);
   const [selecionado, setSelecionado] = useState<number | null>(null);
   const [detalhe, setDetalhe] = useState<Detalhe | null>(null);

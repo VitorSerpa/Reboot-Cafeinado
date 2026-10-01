@@ -1,69 +1,122 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { Cabecalho } from "@/components/Cabecalho";
 import { api, type Usuario } from "@/lib/api";
+import { guardarTokenDaAba } from "@/lib/sessao";
 
-/** Entrada: escolher um usuário de teste do Chamado Pronto (sem senha) ou ir para o chat ao vivo. */
+/** Os dois tipos de login. O suporte é o perfil `analista` no banco. */
+const TIPOS = [
+  { perfil: "solicitante", rotulo: "Solicitante", resumo: "Abra um chamado e converse com o assistente e depois com o suporte." },
+  { perfil: "analista", rotulo: "Suporte", resumo: "Revise a fila de triagem e responda os solicitantes no chat do chamado." },
+] as const;
+
+const destino = (u: Usuario) => (u.perfil === "analista" ? "/triagem" : "/chamado");
+
+/** Entrada: login com e-mail e senha, escolhendo o tipo (solicitante ou suporte). A sessão fica nesta aba. */
 export default function Entrada() {
   const router = useRouter();
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [perfil, setPerfil] = useState<Usuario["perfil"]>("solicitante");
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
+  // Esta aba já tem sessão: vai direto para a tela do perfil.
   useEffect(() => {
-    api<Usuario[]>("/auth/usuarios").then(setUsuarios).catch((e) => setErro(e.message));
-  }, []);
+    api<Usuario>("/auth/me")
+      .then((u) => {
+        guardarTokenDaAba(u.token);
+        router.replace(destino(u));
+      })
+      .catch(() => undefined);
+  }, [router]);
 
-  async function entrar(u: Usuario) {
+  async function entrar(e: FormEvent) {
+    e.preventDefault();
+    if (enviando) return;
+    setErro(null);
+    setEnviando(true);
     try {
-      await api("/auth/entrar", { corpo: { usuarioId: u.id } });
-      router.push(u.perfil === "analista" ? "/triagem" : "/chamado");
-    } catch (e) {
-      setErro((e as Error).message);
+      const u = await api<Usuario>("/auth/entrar", { corpo: { email, senha, perfil } });
+      guardarTokenDaAba(u.token);
+      router.push(destino(u));
+    } catch (falha) {
+      setErro((falha as Error).message);
+      setSenha("");
+      setEnviando(false);
     }
   }
+
+  const tipo = TIPOS.find((t) => t.perfil === perfil)!;
 
   return (
     <>
       <Cabecalho usuario={null} />
-      <main className="conteudo" style={{ maxWidth: 640 }}>
+      <main className="conteudo" style={{ maxWidth: 440 }}>
         <div className="pilha">
-          <h1>Entrar no protótipo</h1>
+          <h1>Entrar</h1>
           <p className="suave">
-            Empresa fictícia <strong>Aurora Distribuição</strong>. Escolha quem você quer ser: quem abre o chamado ou quem faz a triagem.
+            Chamado Pronto · <strong>Aurora Distribuição</strong>
           </p>
-          {erro && <div className="aviso erro">{erro}</div>}
-          {usuarios.map((u) => (
-            <button key={u.id} className="item-fila" onClick={() => entrar(u)}>
-              <div className="linha">
-                <strong>{u.nome}</strong>
-                <span className={`selo ${u.perfil === "analista" ? "azul" : "laranja"}`}>
-                  {u.perfil === "analista" ? "Analista de suporte" : "Solicitante"}
-                </span>
-              </div>
-              <div className="resumo">
-                {u.perfil === "analista"
-                  ? "Revisa os chamados qualificados, responde ao solicitante no mesmo chat e confirma ou corrige a fila, tudo em tempo real."
-                  : "Relata um problema, responde às perguntas do assistente e depois conversa com o suporte na mesma conversa."}
-              </div>
-            </button>
-          ))}
 
-          <h2 style={{ marginTop: 16 }}>Chat ao vivo</h2>
-          <p className="suave">Conversa em tempo real entre um cliente e um atendente humano, sem o agente.</p>
-          <div className="linha" style={{ alignItems: "stretch" }}>
-            <Link href="/chat" className="item-fila" style={{ flex: "1 1 240px" }}>
-              <strong>Falar com o suporte</strong>
-              <div className="resumo">Abre um atendimento como cliente.</div>
-            </Link>
-            <Link href="/suporte" className="item-fila" style={{ flex: "1 1 240px" }}>
-              <strong>Painel do atendente</strong>
-              <div className="resumo">Acompanha a fila de atendimentos e responde (pede o token de suporte).</div>
-            </Link>
-          </div>
+          <form className="cartao pilha" onSubmit={entrar}>
+            <div role="radiogroup" aria-label="Tipo de login" className="grid grid-cols-2 gap-1 rounded-lg bg-fundo p-1">
+              {TIPOS.map((t) => (
+                <button
+                  key={t.perfil}
+                  type="button"
+                  role="radio"
+                  aria-checked={perfil === t.perfil}
+                  onClick={() => {
+                    setPerfil(t.perfil);
+                    setErro(null);
+                  }}
+                  className={`cursor-pointer rounded-md px-3 py-2 font-titulo text-sm font-semibold transition-colors ${
+                    perfil === t.perfil ? "bg-laranja text-white" : "text-cinza hover:text-texto"
+                  }`}
+                >
+                  {t.rotulo}
+                </button>
+              ))}
+            </div>
+            <p className="suave">{tipo.resumo}</p>
+
+            <div>
+              <label className="rotulo" htmlFor="email">
+                E-mail
+              </label>
+              <input
+                id="email"
+                className="campo"
+                type="email"
+                autoComplete="username"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="rotulo" htmlFor="senha">
+                Senha
+              </label>
+              <input
+                id="senha"
+                className="campo"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+              />
+            </div>
+            {erro && <div className="aviso erro">{erro}</div>}
+            <button className="botao" type="submit" disabled={enviando || !email.trim() || !senha}>
+              {enviando ? "Entrando…" : `Entrar como ${tipo.rotulo.toLowerCase()}`}
+            </button>
+          </form>
         </div>
       </main>
     </>

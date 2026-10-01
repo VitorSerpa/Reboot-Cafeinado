@@ -10,7 +10,6 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/**/*.test.ts",
-    "smoke": "node scripts/smoke-chat.mjs",
     "smoke-chamados": "node scripts/smoke-chamados.mjs",
     "smoke-hub": "tsx scripts/smoke-hub.ts",
     "gerar-token": "tsx scripts/admin.ts gerar-token",
@@ -20,7 +19,10 @@
     "exportar-catalogo": "tsx scripts/admin.ts exportar",
     "acesso-banco": "tsx scripts/admin.ts acesso-banco",
     "revogar-acesso-banco": "tsx scripts/admin.ts revogar-acesso-banco",
-    "diagnosticar-banco": "tsx scripts/admin.ts diagnosticar-banco"
+    "diagnosticar-banco": "tsx scripts/admin.ts diagnosticar-banco",
+    "listar-usuarios": "tsx scripts/admin.ts listar-usuarios",
+    "definir-senha": "tsx scripts/admin.ts definir-senha",
+    "criar-usuario": "tsx scripts/admin.ts criar-usuario"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

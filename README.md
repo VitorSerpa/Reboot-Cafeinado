@@ -1,12 +1,12 @@
 # Reboot Cafeinado — Chamado Pronto
 
-Projeto do Reboot Cafeinado (Kaffa Journeys 2026): o funcionário descreve o problema em texto livre, o agente **Qualificador Aurora** no Kaffa AI Hub pergunta só o que falta e sugere a fila. Quando o agente conclui, o chamado entra direto na fila (não há passo de "enviar para o suporte"), e o atendente responde **no mesmo chat** em que o agente qualificou, além de confirmar ou corrigir a fila na tela de triagem. O chat e a fila andam em **tempo real, por WebSocket** (socket.io). Tem também um chat ao vivo entre cliente e atendente humano.
+Projeto do Reboot Cafeinado (Kaffa Journeys 2026): o funcionário descreve o problema em texto livre, o agente **Qualificador Aurora** no Kaffa AI Hub pergunta só o que falta e sugere a fila. Quando o agente conclui, o chamado entra direto na fila (não há passo de "enviar para o suporte"), e o atendente responde **no mesmo chat** em que o agente qualificou, além de confirmar ou corrigir a fila na tela de triagem. O chat e a fila andam em **tempo real, por WebSocket** (socket.io).
 
 ```
 frontend/  Next 16 + Tailwind 4, identidade visual Kaffa:
-           entrada, /chamado (solicitante), /triagem (analista), /chat e /suporte (chat ao vivo)
+           login (solicitante ou suporte), /chamado (solicitante), /triagem (suporte)
 backend/   Express 5 + TypeScript + socket.io: API, regras sobre a resposta do agente, cliente do Hub (SSE),
-           Postgres, WebSocket (/chamados e chat ao vivo)
+           Postgres, WebSocket (/chamados), login com e-mail e senha
 dados/aurora/*.csv   carga inicial do contexto da Aurora no Postgres (o banco é a fonte da verdade)
 hub/prompt-qualificador-aurora.md          prompt em uso hoje no Hub (conector CSV)
 hub/prompt-qualificador-aurora-v4-banco.md prompt v4, para o conector PostgreSQL (banco no Supabase)
@@ -30,17 +30,27 @@ npm install
 npm run dev
 ```
 
-Abra http://localhost:3000 e escolha um usuário de teste: **Ana** ou **Carlos** (solicitantes) ou **Bruna** (analista). O chat ao vivo fica em `/chat` (cliente) e `/suporte` (atendente, com o `SUPPORT_TOKEN`).
+Abra http://localhost:3000 e entre com e-mail e senha, escolhendo o tipo de login: **Solicitante** (abre chamado: Ana e Carlos) ou **Suporte** (triagem e resposta no chat: Bruna, perfil `analista` no banco). Entrar pelo tipo errado é recusado.
+
+**Senhas:** ficam na própria tabela `usuarios` (colunas `email` e `senha_hash`, só o hash scrypt; 5 erros seguidos bloqueiam por 15 minutos). Em desenvolvimento, quem ainda não tem senha ganha uma ao subir o backend, e o terminal mostra **uma vez só** o e-mail (`<usuário>@aurora.test`) e a senha. Depois, com o backend rodando:
+
+```bash
+cd backend
+npm run definir-senha -- ana
+```
+
+`definir-senha` troca a senha (e aceita um e-mail: `-- ana ana@empresa.com`), `listar-usuarios` mostra quem tem senha e `criar-usuario -- <id> "<Nome>" <solicitante|analista> [e-mail]` cria outro usuário.
+
+Cada aba guarda a própria sessão: dá para deixar o suporte na triagem numa aba e o solicitante em outra, no mesmo navegador.
 
 - **Sem `.env`, o backend usa o Hub simulado:** respostas fixas, sem chave e sem custo. O cabeçalho mostra "Hub: simulado".
 - **Banco:** Postgres embutido (PGlite), em `~/.reboot-cafeinado/pgdata`, fora do OneDrive. Para usar o Supabase (ou outro Postgres), preencha `DATABASE_URL`: veja [Banco no Supabase](#banco-no-supabase). Para zerar os dados, apague essa pasta com o backend parado.
 
 ## Tempo real (WebSocket)
 
-O backend tem um servidor socket.io (`/socket.io`, porta 3333) com dois namespaces:
+O backend tem um servidor socket.io (`/socket.io`, porta 3333) com o namespace:
 
 - **`/chamados`**: o Chamado Pronto. O handshake usa o mesmo cookie de sessão da API; sem sessão, a conexão é recusada. Cada usuário fica na sala `usuario:<id>`, e cada analista também na sala `triagem:<empresa>`.
-- **`/`**: o chat ao vivo entre cliente e atendente (veja `backend/README.md`).
 
 | Evento | Direção | O que faz |
 |---|---|---|
@@ -67,7 +77,7 @@ npm run smoke-chamados
 
 1. `cd backend` e copie `.env.example` para `.env`.
 2. Preencha `HUB_API_KEY=` com a sua chave. O agente já vem configurado em `HUB_AGENTE_AURORA`.
-3. Reinicie o backend. O terminal deve mostrar `Hub: real (https://belatrix.ai, agente 06aadae6-…)`, e o cabeçalho do app, "Hub: real".
+3. Reinicie o backend. O terminal deve mostrar `Hub: real (https://belatrix.ai, agente 06abc3a3-…)`, e o cabeçalho do app, "Hub: real".
 
 ## Contexto no banco
 
@@ -87,7 +97,7 @@ O agente lê esse contexto por um de três caminhos:
 2. Em **Connect**, copie a URI do **Session pooler**. A conexão direta do plano gratuito é só IPv6, e o Hub pode não alcançá-la.
 3. Em `backend/.env`, preencha `DATABASE_URL` com essa URI, trocando `[YOUR-PASSWORD]` pela senha. Na senha, `@` vira `%40`, `#` vira `%23` e `/` vira `%2F`.
 4. Opcional: baixe o certificado em Database Settings → SSL Configuration e aponte `DATABASE_SSL_CA` para ele. Assim o app verifica o servidor.
-5. Suba o backend. O terminal deve mostrar `banco: postgres (…pooler.supabase.com, …)`. As tabelas e a carga inicial da Aurora são criadas na primeira subida.
+5. Suba o backend. O terminal deve mostrar `banco: postgres (…pooler.supabase.com, …)`. As tabelas e a carga inicial da Aurora são criadas na primeira subida, e o que faltar (como as colunas de login em `usuarios`) a cada subida. Se preferir aplicar à mão, o SQL está em `backend/sql/usuarios-login.sql`, para colar no SQL Editor.
 
 O app não usa a Data API do Supabase, que publica o schema `public`. Por isso todas as tabelas ficam com RLS ligado e sem política, e os papéis `anon` e `authenticated` perdem o acesso a elas. Se quiser, desligue a Data API em Project Settings → Data API.
 
@@ -233,14 +243,15 @@ Estas regras ficam em `backend/src/dominio/contrato.ts`, com testes em `npm test
 - confiança abaixo de 0,7 vira abstenção;
 - fila fora do catálogo vira abstenção;
 - consulta ao catálogo que falhou e não foi refeita vira abstenção;
+- fila sugerida sem nenhuma consulta ao catálogo que deu certo (fila adivinhada) vira abstenção;
 - resposta fora do formato: uma nova tentativa e, se falhar de novo, triagem humana;
 - Hub indisponível: formulário curto, e o chamado não se perde;
 - a empresa sai sempre do usuário logado, e cada solicitante só vê os próprios chamados.
 
 ## Limitações do protótipo
 
-- Login sem senha: escolha de usuário de teste.
+- A sessão da aba é um token assinado (8 h) guardado no `sessionStorage`, com o cookie de reserva. Sair apaga os dois, mas não há lista de sessões para derrubar de outro lugar.
 - Uma empresa só (Aurora). As tabelas já separam por empresa.
 - O texto do agente aparece inteiro ao final do turno, não aos poucos: ele responde em JSON, que só vale depois de validado. O que chega ao vivo é a fase do agente.
-- O barramento de eventos e o chat ao vivo ficam em memória: com mais de uma instância do backend, seria preciso um adapter do socket.io (Redis, por exemplo).
+- O barramento de eventos fica em memória: com mais de uma instância do backend, seria preciso um adapter do socket.io (Redis, por exemplo).
 - Sem precedentes nem medição (semana 3, no plano técnico).

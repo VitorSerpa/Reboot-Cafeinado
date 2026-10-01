@@ -5,6 +5,7 @@ import { io, type Socket } from "socket.io-client";
 
 import { ErroApi } from "@/lib/api";
 import { urlDoBackend } from "@/lib/backend";
+import { tokenDaAba } from "@/lib/sessao";
 
 import type { ClienteParaServidor, EstadoChamado, FaseAgente, Resposta, ServidorParaCliente } from "./tipos";
 
@@ -57,17 +58,23 @@ export function pedir<E extends keyof Pedidos>(socket: SocketChamados, evento: E
 }
 
 /**
- * Conexão com o namespace `/chamados` enquanto `ativo` (em geral: depois de a sessão carregar).
- * O backend identifica o usuário pelo cookie de sessão no handshake.
+ * Conexão com o namespace `/chamados` para o usuário desta tela (em geral: depois de a sessão carregar).
+ * O handshake manda o token desta aba, lido de novo a cada reconexão; sem token, o backend usa o cookie.
+ * Sem o token, uma reconexão (backend reiniciado, rede caiu) chegaria com o cookie do último login do navegador:
+ * a triagem viraria o solicitante de outra aba e pararia de receber a fila.
  * `socket` só aparece depois da primeira conexão e continua o mesmo nas reconexões.
  */
-export function useTempoReal(ativo: boolean) {
+export function useTempoReal(usuarioId: string | null) {
   const [socket, setSocket] = useState<SocketChamados | null>(null);
   const [conectado, setConectado] = useState(false);
 
   useEffect(() => {
-    if (!ativo) return;
-    const s: SocketChamados = io(`${urlDoBackend()}/chamados`, { transports: ["websocket"], withCredentials: true });
+    if (!usuarioId) return;
+    const s: SocketChamados = io(`${urlDoBackend()}/chamados`, {
+      transports: ["websocket"],
+      withCredentials: true,
+      auth: (cb) => cb({ token: tokenDaAba() }),
+    });
     const caiu = () => setConectado(false);
     s.on("connect", () => {
       setSocket(s);
@@ -80,7 +87,7 @@ export function useTempoReal(ativo: boolean) {
       setSocket(null);
       setConectado(false);
     };
-  }, [ativo]);
+  }, [usuarioId]);
 
   return { socket, conectado };
 }

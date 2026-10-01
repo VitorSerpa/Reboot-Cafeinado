@@ -5,8 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { api, ErroApi, type Usuario } from "@/lib/api";
+import { esquecerTokenDaAba, guardarTokenDaAba } from "@/lib/sessao";
 
-/** Carrega o usuário da sessão; sem sessão (ou perfil errado), volta para a tela de entrada. */
+/**
+ * Carrega o usuário da sessão desta aba; sem sessão (ou perfil errado), volta para a tela de entrada.
+ * Guarda o token que vem junto: a partir daí a aba fica com este usuário, mesmo que outra aba entre com outro.
+ */
 export function useSessao(perfil?: Usuario["perfil"]) {
   const router = useRouter();
   const [usuario, setUsuario] = useState<Usuario | null>(null);
@@ -14,6 +18,7 @@ export function useSessao(perfil?: Usuario["perfil"]) {
   useEffect(() => {
     api<Usuario>("/auth/me")
       .then((u) => {
+        guardarTokenDaAba(u.token);
         if (perfil && u.perfil !== perfil) router.replace(u.perfil === "analista" ? "/triagem" : "/chamado");
         else setUsuario(u);
       })
@@ -41,6 +46,7 @@ export function Cabecalho({
 
   async function sair() {
     await api("/auth/sair", { corpo: {} }).catch(() => undefined);
+    esquecerTokenDaAba();
     router.replace("/");
   }
 
@@ -73,7 +79,7 @@ export function Cabecalho({
           <span className="usuario">
             {usuario.nome}
             <br />
-            {usuario.perfil === "analista" ? "Analista de suporte" : "Solicitante"} · Aurora Distribuição
+            {usuario.perfil === "analista" ? "Suporte" : "Solicitante"} · Aurora Distribuição
           </span>
           <button onClick={sair}>Sair</button>
         </>
