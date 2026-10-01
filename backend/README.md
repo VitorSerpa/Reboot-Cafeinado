@@ -65,8 +65,8 @@ WebSocket usam o token antes do cookie, para cada aba ficar com o próprio usuá
 | Var | Default | Descrição |
 | --- | --- | --- |
 | `PORT` | `3333` | Porta HTTP |
-| `NODE_ENV` | `development` | Em `development` o handler de erro devolve o stack, e o backend cria as senhas que faltam ao subir |
-| `CORS_ORIGIN` | `http://localhost:3000` | Origens permitidas (HTTP e WebSocket), separadas por vírgula |
+| `NODE_ENV` | `development` | Em `development` o handler de erro devolve o stack e aceita qualquer porta de `localhost` no CORS; com o banco local (PGlite), o backend também cria as senhas que faltam ao subir |
+| `CORS_ORIGIN` | `http://localhost:3000` | Origens permitidas (HTTP e WebSocket), separadas por vírgula. Em `development`, qualquer porta de `localhost` também |
 | `SESSION_SECRET` | `dev-somente-local` | Assina a sessão (cookie e token da aba), na API e no handshake do `/chamados` |
 | `DATABASE_URL` | vazio | Postgres (Supabase). Vazio = PGlite em `PGLITE_DIR` |
 | `DATABASE_SSL_CA` | vazio | Certificado da CA do Supabase, para verificar o servidor |
@@ -74,5 +74,5 @@ WebSocket usam o token antes do cookie, para cada aba ficar com o próprio usuá
 | `HUB_MODE` | `real` com chave, senão `simulado` | `simulado` usa respostas fixas, sem custo |
 | `HUB_BASE_URL` | `https://belatrix.ai` | Endereço do Kaffa AI Hub |
 | `HUB_API_KEY` | vazio | Chave do Hub; com ela, o modo vira `real` |
-| `HUB_AGENTE_AURORA` | `06abc3a3-…` | Agente Qualificador Aurora |
+| `HUB_AGENTE_AURORA` | `06abc3a3-…` | Agente da Aurora **só na primeira carga do banco**. Depois quem manda é o banco: `npm run definir-agente -- aurora <uuid>` |
 | `HUB_TIMEOUT_MS` | `90000` | Tempo máximo de um turno do agente |

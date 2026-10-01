@@ -7,6 +7,7 @@ import { DADOS_DIR } from "../dados/csv.js";
 import * as catalogo from "../dominio/catalogo.js";
 import * as chamados from "../dominio/chamados.js";
 import * as acessoBanco from "../dominio/acessoBanco.js";
+import * as agentes from "../dominio/agentes.js";
 import * as tokens from "../dominio/tokens.js";
 import { ErroApp } from "../dominio/erros.js";
 import * as triagem from "../dominio/triagem.js";
@@ -127,6 +128,18 @@ rotas.post("/admin/usuarios/:id/senha", soLocal, async (req, res) => {
   res.json(
     await autenticacao.definirSenha(String(req.params.id), { email: req.body?.email ? String(req.body.email) : undefined }),
   );
+});
+
+// Agente da empresa: fica no banco e vale para todos os backends que usam o mesmo banco.
+rotas.get("/admin/empresas/:empresa/agente", soLocal, async (req, res) => {
+  const empresa = String(req.params.empresa);
+  const achada = (await agentes.agentesPorEmpresa()).find((e) => e.id === empresa);
+  if (!achada) throw new ErroApp(404, "empresa", `Empresa "${empresa}" não existe.`);
+  res.json({ empresa, agente_id: achada.agente_id, env: env.hub.agenteAurora });
+});
+
+rotas.post("/admin/empresas/:empresa/agente", soLocal, async (req, res) => {
+  res.json(await agentes.definirAgente(String(req.params.empresa), String(req.body?.agenteId ?? "")));
 });
 
 rotas.post("/admin/empresas/:empresa/tokens-conector", soLocal, async (req, res) => {

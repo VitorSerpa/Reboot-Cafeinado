@@ -30,9 +30,9 @@ npm install
 npm run dev
 ```
 
-Abra http://localhost:3000 e entre com e-mail e senha, escolhendo o tipo de login: **Solicitante** (abre chamado: Ana e Carlos) ou **Suporte** (triagem e resposta no chat: Bruna, perfil `analista` no banco). Entrar pelo tipo errado é recusado.
+Abra http://localhost:3000 (se a porta estiver ocupada, o Next sobe na 3001; em desenvolvimento o backend aceita qualquer porta de localhost) e entre com e-mail e senha, escolhendo o tipo de login: **Solicitante** (abre chamado: Ana e Carlos) ou **Suporte** (triagem e resposta no chat: Bruna, perfil `analista` no banco). Entrar pelo tipo errado é recusado.
 
-**Senhas:** ficam na própria tabela `usuarios` (colunas `email` e `senha_hash`, só o hash scrypt; 5 erros seguidos bloqueiam por 15 minutos). Em desenvolvimento, quem ainda não tem senha ganha uma ao subir o backend, e o terminal mostra **uma vez só** o e-mail (`<usuário>@aurora.test`) e a senha. Depois, com o backend rodando:
+**Senhas:** ficam na própria tabela `usuarios` (colunas `email` e `senha_hash`, só o hash scrypt; 5 erros seguidos bloqueiam por 15 minutos). Com o banco local (PGlite), em desenvolvimento, quem ainda não tem senha ganha uma ao subir o backend, e o terminal mostra **uma vez só** o e-mail (`<usuário>@aurora.test`) e a senha. **Com o Supabase, que o time compartilha, a subida não cria senhas**: elas ficariam só no terminal de quem subiu. Para criar ou trocar, com o backend rodando:
 
 ```bash
 cd backend
@@ -76,8 +76,18 @@ npm run smoke-chamados
 ## Ligar no agente real
 
 1. `cd backend` e copie `.env.example` para `.env`.
-2. Preencha `HUB_API_KEY=` com a sua chave. O agente já vem configurado em `HUB_AGENTE_AURORA`.
-3. Reinicie o backend. O terminal deve mostrar `Hub: real (https://belatrix.ai, agente 06abc3a3-…)`, e o cabeçalho do app, "Hub: real".
+2. Preencha `HUB_API_KEY=` com a sua chave.
+3. Reinicie o backend. O terminal deve mostrar `Hub: real (https://belatrix.ai)` e `agente da aurora (no banco): 06abc3a3-…`, e o cabeçalho do app, "Hub: real".
+
+**O agente fica no banco, não no `.env`.** O `HUB_AGENTE_AURORA` só o preenche na primeira carga. Com o Supabase, o agente vale para todos que usam o banco, e subir o backend com outro `.env` não o troca: o terminal só avisa. Para ver ou trocar, com o backend rodando (a troca vale já no próximo turno de cada chamado):
+
+```bash
+npm run definir-agente -- aurora
+```
+
+```bash
+npm run definir-agente -- aurora 06abc3a3-1c9f-785e-8000-519434bce89a
+```
 
 ## Contexto no banco
 

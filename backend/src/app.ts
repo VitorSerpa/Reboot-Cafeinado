@@ -2,6 +2,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 
+import { opcoesCors } from "./config/cors.js";
 import { env } from "./config/env.js";
 import { rotasConector } from "./conector/app.js";
 import { errorHandler } from "./middlewares/error-handler.js";
@@ -12,7 +13,7 @@ import { rotas } from "./rotas/index.js";
 export function createApp() {
   const app = express();
 
-  app.use(cors({ origin: env.corsOrigin, credentials: true }));
+  app.use(cors(opcoesCors));
   app.use(express.json({ limit: "100kb" }));
   app.use(cookieParser(env.sessionSecret));
 

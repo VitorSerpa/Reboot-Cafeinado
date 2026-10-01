@@ -13,6 +13,7 @@
  *   npm run listar-usuarios                       → quem pode entrar (e-mail, último login, bloqueio), sem segredo
  *   npm run definir-senha -- <usuário> [e-mail]   → senha nova para o login do app (mostrada UMA vez)
  *   npm run criar-usuario -- <id> "<Nome>" <solicitante|analista> [e-mail]  → usuário novo na Aurora, já com senha
+ *   npm run definir-agente -- aurora [uuid]       → mostra ou troca o agente da empresa (no banco: vale para todo o time)
  */
 import { env } from "../src/config/env.js";
 
@@ -119,10 +120,23 @@ try {
       mostrarLogin(await chamar("POST", "/usuarios", { id: arg, nome: descricao, perfil, email }));
       break;
     }
+    case "definir-agente": {
+      const empresa = arg ?? "aurora";
+      if (!descricao) {
+        const a = await chamar("GET", `/empresas/${encodeURIComponent(empresa)}/agente`);
+        console.log(`Agente de ${a.empresa} no banco: ${a.agente_id}${a.agente_id === a.env ? "" : `  (o .env desta máquina pede ${a.env})`}`);
+        console.log(`Para trocar: npm run definir-agente -- ${a.empresa} <uuid>`);
+        break;
+      }
+      const r = await chamar("POST", `/empresas/${encodeURIComponent(empresa)}/agente`, { agenteId: descricao });
+      console.log(`Agente de ${r.empresa}: ${r.antes} → ${r.depois}.`);
+      console.log("Vale para todos os backends que usam este banco, já no próximo turno de cada chamado.");
+      break;
+    }
     default:
       console.error(
         "Comandos: gerar-token, listar-tokens, revogar-token, recarregar, exportar, acesso-banco, diagnosticar-banco, revogar-acesso-banco, " +
-          "listar-usuarios, definir-senha, criar-usuario",
+          "listar-usuarios, definir-senha, criar-usuario, definir-agente",
       );
       process.exit(1);
   }

@@ -22,7 +22,8 @@
     "diagnosticar-banco": "tsx scripts/admin.ts diagnosticar-banco",
     "listar-usuarios": "tsx scripts/admin.ts listar-usuarios",
     "definir-senha": "tsx scripts/admin.ts definir-senha",
-    "criar-usuario": "tsx scripts/admin.ts criar-usuario"
+    "criar-usuario": "tsx scripts/admin.ts criar-usuario",
+    "definir-agente": "tsx scripts/admin.ts definir-agente"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

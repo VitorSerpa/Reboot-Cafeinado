@@ -2,7 +2,7 @@ import { env } from "../config/env.js";
 import { cargaInicialSeVazio } from "../dominio/catalogo.js";
 import { db } from "./index.js";
 
-const DESCRICAO_AURORA =
+export const DESCRICAO_AURORA =
   "Distribuidora atacadista de materiais de escritório e limpeza, com matriz e duas filiais. " +
   "O Financeiro processa pagamentos a fornecedores, acompanha recebimentos, aprova despesas e faz o fechamento contábil.";
 
@@ -11,14 +11,19 @@ const DESCRICAO_AURORA =
  * O catálogo só é carregado se a empresa ainda não tem um: depois disso, o banco é a fonte da verdade
  * (recarga explícita: npm run recarregar-catalogo -- aurora).
  */
-export async function semear() {
-  await db.query(
-    `insert into empresas (id, nome, mercado, area, agente_id, descricao)
+/**
+ * O agente da empresa fica no banco. O .env (HUB_AGENTE_AURORA) só o preenche na primeira carga ou se estiver vazio:
+ * com o banco compartilhado (Supabase), subir o backend não troca o agente do time todo.
+ * Para trocar: npm run definir-agente -- aurora <uuid>.
+ */
+export const SQL_EMPRESA_AURORA = `insert into empresas (id, nome, mercado, area, agente_id, descricao)
      values ('aurora', 'Aurora Distribuição', 'Distribuição atacadista', 'Financeiro', $1, $2)
-     on conflict (id) do update set agente_id = excluded.agente_id,
-       descricao = case when empresas.descricao = '' then excluded.descricao else empresas.descricao end`,
-    [env.hub.agenteAurora, DESCRICAO_AURORA],
-  );
+     on conflict (id) do update set
+       agente_id = case when empresas.agente_id = '' then excluded.agente_id else empresas.agente_id end,
+       descricao = case when empresas.descricao = '' then excluded.descricao else empresas.descricao end`;
+
+export async function semear() {
+  await db.query(SQL_EMPRESA_AURORA, [env.hub.agenteAurora, DESCRICAO_AURORA]);
 
   const usuarios = [
     ["ana", "Ana Ribeiro", "solicitante"],

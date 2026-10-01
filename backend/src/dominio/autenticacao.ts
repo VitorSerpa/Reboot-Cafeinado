@@ -10,6 +10,13 @@ const MAX_TENTATIVAS = 5;
 const BLOQUEIO_MIN = 15;
 export const SENHA_MIN = 10;
 
+/**
+ * A subida só cria senhas com o banco local, em desenvolvimento. No banco compartilhado (Supabase), a senha
+ * apareceria só no terminal de quem subiu, e o resto do time não saberia; lá, use npm run definir-senha.
+ */
+export const criaSenhasNaSubida = (nodeEnv: string, bancoCompartilhado: boolean) =>
+  nodeEnv === "development" && !bancoCompartilhado;
+
 /** Os dois tipos de login: o solicitante abre chamados; o suporte (perfil analista) faz a triagem e responde. */
 export const NOME_DO_PERFIL: Record<Usuario["perfil"], string> = { solicitante: "solicitante", analista: "suporte" };
 
