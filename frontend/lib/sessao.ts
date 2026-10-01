@@ -29,3 +29,21 @@ export function esquecerTokenDaAba() {
     // nada a fazer
   }
 }
+
+/**
+ * A sessão desta aba acabou (saiu em outra aba, venceu, senha trocada): esquece o token e volta para o login.
+ * Na própria tela de login só esquece, para não recarregar sem fim.
+ */
+export function sessaoTerminou() {
+  const tinhaSessao = Boolean(tokenDaAba());
+  esquecerTokenDaAba();
+  if (saindo || typeof window === "undefined" || window.location.pathname === "/") return;
+  // Quem nunca entrou nesta aba só vai para o login, sem o aviso de sessão encerrada.
+  window.location.replace(tinhaSessao ? "/?sessao=encerrada" : "/");
+}
+
+/** Saída pedida pela própria pessoa: o WebSocket que cai em seguida não mostra o aviso de sessão encerrada. */
+let saindo = false;
+export function marcarSaida() {
+  saindo = true;
+}

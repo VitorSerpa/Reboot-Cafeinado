@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Cabecalho, useSessao } from "@/components/Cabecalho";
+import { Cabecalho, useSessao, VerificandoSessao } from "@/components/Cabecalho";
 import { Conversa } from "@/components/Conversa";
 import { api, type Catalogo, type Chamado, type ToolCall, type Turno } from "@/lib/api";
 import { camposInformados } from "@/lib/informacoes";
@@ -86,7 +86,7 @@ function SeloSituacao({ item }: { item: Pick<ItemFila, "status" | "resultado_sta
 }
 
 export default function Triagem() {
-  const usuario = useSessao("analista");
+  const { usuario, erro: erroSessao } = useSessao("analista");
   const { socket, conectado } = useTempoReal(usuario?.id ?? null);
   const [fila, setFila] = useState<ItemFila[]>([]);
   const [selecionado, setSelecionado] = useState<number | null>(null);
@@ -139,6 +139,9 @@ export default function Triagem() {
 
   const nomeFila = (slug: string | null) => catalogo?.filas.find((f) => f.slug === slug)?.nome ?? slug ?? "—";
   const pendentes = fila.filter((f) => f.status === "aguardando_triagem").length;
+  // Nada da tela aparece antes de a sessão ser conferida (e do perfil certo).
+  if (!usuario) return <VerificandoSessao erro={erroSessao} />;
+
   return (
     <>
       <Cabecalho usuario={usuario} conectado={usuario ? conectado : undefined} />

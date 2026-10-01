@@ -245,7 +245,13 @@ export async function abrirChamado(usuario: Usuario, texto: string) {
   return rodarTurno(novo!, montarMensagem("relato", relato, 0));
 }
 
+/** Responder ao assistente e preencher o formulário curto é do dono do chamado, não do suporte. */
+function exigirSolicitante(usuario: Usuario) {
+  if (usuario.perfil !== "solicitante") throw new ErroApp(403, "perfil", "Só o solicitante responde ao assistente.");
+}
+
 export async function responder(usuario: Usuario, id: number, texto: string) {
+  exigirSolicitante(usuario);
   const chamado = await carregarComAcesso(usuario, id);
   if (chamado.status !== "qualificando") throw new ErroApp(409, "fora_de_fluxo", "Este chamado não está mais esperando resposta.");
   const resposta = texto.trim();
@@ -281,6 +287,7 @@ export async function enviarMensagem(usuario: Usuario, id: number, texto: string
 }
 
 export async function contingencia(usuario: Usuario, id: number, campos: Record<string, string>) {
+  exigirSolicitante(usuario);
   const chamado = await carregarComAcesso(usuario, id);
   if (chamado.status === "aguardando_triagem" || chamado.status === "triado") {
     throw new ErroApp(409, "fora_de_fluxo", "Este chamado já foi enviado.");

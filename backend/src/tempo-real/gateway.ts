@@ -1,12 +1,10 @@
-import cookieParser from "cookie-parser";
 import type { Namespace, Server, Socket } from "socket.io";
 
-import { env } from "../config/env.js";
 import * as chamados from "../dominio/chamados.js";
 import { ErroApp } from "../dominio/erros.js";
 import { eventos } from "../dominio/eventos.js";
 import * as triagem from "../dominio/triagem.js";
-import { buscarUsuario, COOKIE_SESSAO, idDoToken } from "../dominio/usuarios.js";
+import { COOKIE_SESSAO, hashDaSessao, usuarioDaSessao } from "../dominio/usuarios.js";
 import type { Ack, ClienteParaServidor, DadosSocket, EstadoChamado, ServidorParaCliente } from "./tipos.js";
 
 type NamespaceChamados = Namespace<ClienteParaServidor, ServidorParaCliente, never, DadosSocket>;
@@ -15,14 +13,13 @@ type SocketChamados = Socket<ClienteParaServidor, ServidorParaCliente, never, Da
 const salaUsuario = (id: string) => `usuario:${id}`;
 const salaTriagem = (empresaId: string) => `triagem:${empresaId}`;
 
-/** Lê o cookie de sessão assinado do handshake — o mesmo que a API REST usa. */
-function idDoCookie(cabecalho: string | undefined): string | null {
+const salaSessao = (hash: string) => `sessao:${hash}`;
+
+/** Lê o token de sessão do cookie do handshake — o mesmo que a API REST usa. */
+function tokenDoCookie(cabecalho: string | undefined): string | null {
   for (const parte of (cabecalho ?? "").split(";")) {
     const [nome, ...resto] = parte.trim().split("=");
-    if (nome !== COOKIE_SESSAO) continue;
-    const valor = decodeURIComponent(resto.join("="));
-    const id = valor.startsWith("s:") ? cookieParser.signedCookie(valor, env.sessionSecret) : false;
-    return typeof id === "string" ? id : null;
+    if (nome === COOKIE_SESSAO) return decodeURIComponent(resto.join("="));
   }
   return null;
 }
@@ -59,11 +56,11 @@ export function criarGatewayChamados(io: Server) {
     try {
       // O token da aba vem antes do cookie: o cookie é um só por navegador, e a reconexão da triagem chegaria
       // como o solicitante que entrou em outra aba (sem a sala da fila, a tela parava de atualizar).
-      const token = socket.handshake.auth?.token;
-      const id = token ? idDoToken(token) : idDoCookie(socket.handshake.headers.cookie);
-      const usuario = id ? await buscarUsuario(id) : undefined;
+      const token = socket.handshake.auth?.token || tokenDoCookie(socket.handshake.headers.cookie);
+      const usuario = await usuarioDaSessao(token);
       if (!usuario) return next(new Error("sem_sessao"));
       socket.data.usuario = usuario;
+      socket.data.sessao = hashDaSessao(token);
       next();
     } catch (erro) {
       next(erro as Error);
@@ -72,7 +69,7 @@ export function criarGatewayChamados(io: Server) {
 
   nsp.on("connection", (socket: SocketChamados) => {
     const usuario = socket.data.usuario;
-    socket.join(salaUsuario(usuario.id));
+    socket.join([salaUsuario(usuario.id), salaSessao(socket.data.sessao)]);
     if (usuario.perfil === "analista") socket.join(salaTriagem(usuario.empresa_id));
 
     socket.on("chamado:abrir", (payload, ack) =>
@@ -99,6 +96,11 @@ export function criarGatewayChamados(io: Server) {
         return estado(chamado.id, usuario);
       }),
     );
+  });
+
+  // Sair (ou senha nova) derruba na hora o WebSocket dessa sessão; a reconexão é recusada no handshake.
+  eventos.on("sessao", (e) => {
+    nsp.in("sessao" in e ? salaSessao(e.sessao) : salaUsuario(e.usuarioId)).disconnectSockets(true);
   });
 
   eventos.on("agente", ({ solicitanteId, ...progresso }) => {

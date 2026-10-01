@@ -21,9 +21,13 @@ export type FaseAgente =
 
 export type AgenteTrabalhando = { chamadoId: number; solicitanteId: string } & FaseAgente;
 
+/** Sessão encerrada (sair) ou todas as de um usuário (senha nova): o WebSocket aberto com elas cai. */
+export type SessaoEncerrada = { sessao: string } | { usuarioId: string };
+
 interface Mapa {
   chamado: [ChamadoMudou];
   agente: [AgenteTrabalhando];
+  sessao: [SessaoEncerrada];
 }
 
 /**

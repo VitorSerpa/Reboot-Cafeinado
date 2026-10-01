@@ -1,4 +1,4 @@
-import { tokenDaAba } from "@/lib/sessao";
+import { sessaoTerminou, tokenDaAba } from "@/lib/sessao";
 
 /** Chamada ao backend pelo mesmo domínio (/api é repassado pelo Next ao Express). */
 export class ErroApi extends Error {
@@ -32,6 +32,8 @@ export async function api<T>(rota: string, opcoes: { metodo?: string; corpo?: un
 
   const corpo = await resposta.json().catch(() => ({}));
   if (!resposta.ok) {
+    // Sessão encerrada ou vencida: qualquer tela protegida volta para o login.
+    if (resposta.status === 401 && corpo.erro === "sem_sessao") sessaoTerminou();
     throw new ErroApi(resposta.status, corpo.erro ?? "erro", corpo.mensagem ?? `Erro ${resposta.status}`, corpo);
   }
   return corpo as T;

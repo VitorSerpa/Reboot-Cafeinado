@@ -23,6 +23,7 @@ export default function Entrada() {
   const [senha, setSenha] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [encerrada, setEncerrada] = useState(false);
 
   // Esta aba já tem sessão: vai direto para a tela do perfil.
   useEffect(() => {
@@ -31,7 +32,8 @@ export default function Entrada() {
         guardarTokenDaAba(u.token);
         router.replace(destino(u));
       })
-      .catch(() => undefined);
+      // Sem sessão: se a tela anterior mandou para cá porque a sessão acabou, avisa.
+      .catch(() => setEncerrada(new URLSearchParams(window.location.search).get("sessao") === "encerrada"));
   }, [router]);
 
   async function entrar(e: FormEvent) {
@@ -113,6 +115,7 @@ export default function Entrada() {
               />
             </div>
             {erro && <div className="aviso erro">{erro}</div>}
+            {!erro && encerrada && <div className="aviso info">Sua sessão terminou. Entre de novo para continuar.</div>}
             <button className="botao" type="submit" disabled={enviando || !email.trim() || !senha}>
               {enviando ? "Entrando…" : `Entrar como ${tipo.rotulo.toLowerCase()}`}
             </button>
