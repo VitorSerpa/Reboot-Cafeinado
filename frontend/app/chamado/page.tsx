@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Cabecalho, useSessao } from "@/components/Cabecalho";
+import { Cabecalho, useSessao, VerificandoSessao } from "@/components/Cabecalho";
 import { Conversa } from "@/components/Conversa";
 import { api, ErroApi, type CampoContingencia, type Catalogo, type Chamado, type Turno } from "@/lib/api";
 import { camposInformados } from "@/lib/informacoes";
@@ -36,7 +36,7 @@ const maisNovo = (atual: EstadoChamado | null, chegou: EstadoChamado) =>
   atual && atual.chamado.id === chegou.chamado.id && chegou.turnos.length < atual.turnos.length ? atual : chegou;
 
 export default function AbrirChamado() {
-  const usuario = useSessao("solicitante");
+  const { usuario, erro: erroSessao } = useSessao("solicitante");
   const { socket, conectado } = useTempoReal(usuario?.id ?? null);
   const [estado, setEstado] = useState<EstadoChamado | null>(null);
   const [texto, setTexto] = useState("");
@@ -148,6 +148,9 @@ export default function AbrirChamado() {
   // A mensagem pendente sai da tela quando o aviso do WebSocket já trouxe o turno gravado.
   const ultimo = estado?.turnos.at(-1);
   const mostrarPendente = pendente && !(ultimo?.papel === "solicitante" && ultimo.texto === pendente);
+
+  // Nada da tela aparece antes de a sessão ser conferida (e do perfil certo).
+  if (!usuario) return <VerificandoSessao erro={erroSessao} />;
 
   return (
     <>

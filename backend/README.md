@@ -39,7 +39,7 @@ src/
   dados/csv.ts            # leitura de dados/<empresa>/*.csv
   dominio/                # chamados, triagem, contrato do agente, catálogo, tokens, acesso do Hub ao banco
   dominio/autenticacao.ts # login (e-mail e senha em `usuarios`, hash scrypt, bloqueio após 5 erros)
-  dominio/usuarios.ts     # usuário e sessão (cookie assinado e token da aba)
+  dominio/usuarios.ts     # usuário e sessão (tabela sessoes: token da aba e cookie)
   dominio/eventos.ts      # barramento em memória: o domínio avisa o que mudou
   hub/                    # cliente do Kaffa AI Hub (SSE) e Hub simulado
   tempo-real/tipos.ts     # contrato do /chamados (espelhado em frontend/lib/tempo-real/tipos.ts)
@@ -56,9 +56,15 @@ Para uma nova rota: crie `src/routes/<nome>.ts` exportando um `Router` e registr
 ## Login
 
 Dois tipos: **solicitante** e **suporte** (perfil `analista` no banco). `POST /api/auth/entrar` recebe
-`{ email, senha, perfil }` e recusa quem entra pelo tipo errado. A resposta traz o token da aba (o frontend guarda
-no `sessionStorage`) e grava o cookie assinado de reserva; a API (cabeçalho `x-sessao`) e o handshake do
-WebSocket usam o token antes do cookie, para cada aba ficar com o próprio usuário.
+`{ email, senha, perfil }` e recusa quem entra pelo tipo errado. Cada login abre uma sessão na tabela `sessoes`
+(o banco guarda só o hash do token; vence em 8 h). A resposta traz o token (o frontend guarda no `sessionStorage`)
+e grava o mesmo valor no cookie; a API (cabeçalho `x-sessao`) e o handshake do WebSocket usam o token antes do
+cookie, para cada aba ficar com o próprio usuário.
+
+Proteção das rotas: `exigirLogin` recusa sessão desconhecida, vencida ou encerrada (401), e `exigirPerfil`
+separa as rotas do solicitante (`/chamados`, exceto o detalhe, que confere o dono) das do suporte (`/triagem`), com 403.
+O domínio repete a checagem, porque o WebSocket não passa pelas rotas. `POST /api/auth/sair` encerra a sessão e
+derruba o socket dela; `definir-senha` encerra todas as sessões do usuário.
 
 ## Variáveis de ambiente
 
@@ -67,7 +73,7 @@ WebSocket usam o token antes do cookie, para cada aba ficar com o próprio usuá
 | `PORT` | `3333` | Porta HTTP |
 | `NODE_ENV` | `development` | Em `development` o handler de erro devolve o stack e aceita qualquer porta de `localhost` no CORS; com o banco local (PGlite), o backend também cria as senhas que faltam ao subir |
 | `CORS_ORIGIN` | `http://localhost:3000` | Origens permitidas (HTTP e WebSocket), separadas por vírgula. Em `development`, qualquer porta de `localhost` também |
-| `SESSION_SECRET` | `dev-somente-local` | Assina a sessão (cookie e token da aba), na API e no handshake do `/chamados` |
+| `SESSION_SECRET` | `dev-somente-local` | Segredo do cookie-parser. A sessão não depende dele: fica na tabela `sessoes` |
 | `DATABASE_URL` | vazio | Postgres (Supabase). Vazio = PGlite em `PGLITE_DIR` |
 | `DATABASE_SSL_CA` | vazio | Certificado da CA do Supabase, para verificar o servidor |
 | `PGLITE_DIR` | `~/.reboot-cafeinado/pgdata` | Pasta do Postgres embutido |

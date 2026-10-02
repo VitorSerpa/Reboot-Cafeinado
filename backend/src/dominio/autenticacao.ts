@@ -2,13 +2,14 @@ import { randomBytes, scrypt, timingSafeEqual, type ScryptOptions } from "node:c
 
 import { db } from "../db/index.js";
 import { ErroApp } from "./erros.js";
-import { buscarUsuario, type Usuario } from "./usuarios.js";
+import { buscarUsuario, encerrarSessoesDoUsuario, type Usuario } from "./usuarios.js";
 
 /** Parâmetros do scrypt (custo, bloco, paralelismo) e tamanho do hash. Ficam gravados no hash: dá para subir depois. */
 const SCRYPT = { N: 16384, r: 8, p: 1, tamanho: 64 };
 const MAX_TENTATIVAS = 5;
 const BLOQUEIO_MIN = 15;
-export const SENHA_MIN = 10;
+/** Protótipo: senhas curtas são aceitas para a demonstração. Para uso real, suba para 10 ou mais. */
+export const SENHA_MIN = 5;
 
 /**
  * A subida só cria senhas com o banco local, em desenvolvimento. No banco compartilhado (Supabase), a senha
@@ -94,7 +95,7 @@ function senhaAleatoria() {
 }
 
 /**
- * Define (ou troca) o e-mail e a senha de um usuário e desbloqueia o login.
+ * Define (ou troca) o e-mail e a senha de um usuário, desbloqueia o login e encerra as sessões abertas.
  * Sem `senha`, gera uma aleatória. O valor só existe na resposta: o banco guarda o hash.
  */
 export async function definirSenha(usuarioId: string, opcoes: { email?: string; senha?: string } = {}) {
@@ -117,6 +118,7 @@ export async function definirSenha(usuarioId: string, opcoes: { email?: string; 
      where id = $1`,
     [usuarioId, email, await gerarHash(senha)],
   );
+  await encerrarSessoesDoUsuario(usuarioId);
   return { usuario: usuario.id, nome: usuario.nome, perfil: usuario.perfil, email, senha };
 }
 

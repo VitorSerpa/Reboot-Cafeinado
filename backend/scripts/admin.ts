@@ -11,7 +11,7 @@
  *   npm run diagnosticar-banco -- aurora          → diagnóstico sem segredo (conexão, papel, login de teste descartável)
  *   npm run revogar-acesso-banco -- aurora        → bloqueia esse usuário
  *   npm run listar-usuarios                       → quem pode entrar (e-mail, último login, bloqueio), sem segredo
- *   npm run definir-senha -- <usuário> [e-mail]   → senha nova para o login do app (mostrada UMA vez)
+ *   npm run definir-senha -- <usuário> [e-mail] [--senha=<valor>]  → senha nova para o login (gerada, ou a escolhida)
  *   npm run criar-usuario -- <id> "<Nome>" <solicitante|analista> [e-mail]  → usuário novo na Aurora, já com senha
  *   npm run definir-agente -- aurora [uuid]       → mostra ou troca o agente da empresa (no banco: vale para todo o time)
  */
@@ -111,7 +111,10 @@ try {
     }
     case "definir-senha": {
       if (!arg) throw new Error("Informe o usuário (veja em npm run listar-usuarios).");
-      mostrarLogin(await chamar("POST", `/usuarios/${encodeURIComponent(arg)}/senha`, { email: descricao }));
+      // `--senha=<valor>` escolhe a senha; sem ele, o backend gera uma aleatória.
+      const senha = process.argv.find((a) => a.startsWith("--senha="))?.slice("--senha=".length);
+      const email = descricao && !descricao.startsWith("--") ? descricao : undefined;
+      mostrarLogin(await chamar("POST", `/usuarios/${encodeURIComponent(arg)}/senha`, { email, senha }));
       break;
     }
     case "criar-usuario": {

@@ -5,7 +5,7 @@ import { io, type Socket } from "socket.io-client";
 
 import { ErroApi } from "@/lib/api";
 import { urlDoBackend } from "@/lib/backend";
-import { tokenDaAba } from "@/lib/sessao";
+import { sessaoTerminou, tokenDaAba } from "@/lib/sessao";
 
 import type { ClienteParaServidor, EstadoChamado, FaseAgente, Resposta, ServidorParaCliente } from "./tipos";
 
@@ -80,8 +80,9 @@ export function useTempoReal(usuarioId: string | null) {
       setSocket(s);
       setConectado(true);
     });
-    s.on("disconnect", caiu);
-    s.on("connect_error", caiu);
+    // O servidor só derruba a conexão quando a sessão acabou (sair, senha nova); a recusa no handshake também.
+    s.on("disconnect", (motivo) => (motivo === "io server disconnect" ? sessaoTerminou() : caiu()));
+    s.on("connect_error", (erro) => (erro.message === "sem_sessao" ? sessaoTerminou() : caiu()));
     return () => {
       s.close();
       setSocket(null);

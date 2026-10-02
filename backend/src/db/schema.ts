@@ -36,6 +36,17 @@ begin
   end if;
 end $$;
 
+-- Sessões de login: uma por entrada (cookie e token da aba têm o mesmo valor). Guarda só o hash do token.
+-- Sair encerra a sessão; trocar a senha encerra todas as do usuário. Vencem 8 horas depois do login.
+create table if not exists sessoes (
+  hash         text primary key,
+  usuario_id   text not null references usuarios(id) on delete cascade,
+  criada_em    timestamptz not null default now(),
+  expira_em    timestamptz not null,
+  encerrada_em timestamptz
+);
+create index if not exists sessoes_usuario on sessoes (usuario_id);
+
 create table if not exists filas (
   empresa_id  text not null references empresas(id),
   slug        text not null,
@@ -156,7 +167,7 @@ create table if not exists triagens (
  * O Hub lê o banco por outro caminho: views só leitura no schema hub_<empresa> (dominio/acessoBanco.ts).
  */
 export const TABELAS = [
-  "empresas", "usuarios", "filas", "aplicacoes", "tokens_conector",
+  "empresas", "usuarios", "sessoes", "filas", "aplicacoes", "tokens_conector",
   "categorias", "procedimentos", "chamados", "turnos", "triagens",
 ] as const;
 

@@ -5,15 +5,17 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { api, ErroApi, type Usuario } from "@/lib/api";
-import { esquecerTokenDaAba, guardarTokenDaAba } from "@/lib/sessao";
+import { esquecerTokenDaAba, guardarTokenDaAba, marcarSaida } from "@/lib/sessao";
 
 /**
- * Carrega o usuário da sessão desta aba; sem sessão (ou perfil errado), volta para a tela de entrada.
+ * Carrega o usuário da sessão desta aba; sem sessão, volta para a tela de entrada, e com o perfil errado,
+ * para a tela do perfil certo. Até conferir, `usuario` é null: a tela mostra só `<VerificandoSessao />`.
  * Guarda o token que vem junto: a partir daí a aba fica com este usuário, mesmo que outra aba entre com outro.
  */
 export function useSessao(perfil?: Usuario["perfil"]) {
   const router = useRouter();
   const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
     api<Usuario>("/auth/me")
@@ -24,10 +26,32 @@ export function useSessao(perfil?: Usuario["perfil"]) {
       })
       .catch((e) => {
         if (e instanceof ErroApi && e.status === 401) router.replace("/");
+        else setErro(e instanceof Error ? e.message : "Não foi possível conferir a sessão.");
       });
   }, [perfil, router]);
 
-  return usuario;
+  return { usuario, erro };
+}
+
+/** O que aparece numa tela protegida enquanto a sessão não foi conferida (nada do conteúdo vaza antes). */
+export function VerificandoSessao({ erro }: { erro: string | null }) {
+  return (
+    <>
+      <Cabecalho usuario={null} />
+      <main className="conteudo" style={{ maxWidth: 520 }}>
+        {erro ? (
+          <div className="pilha">
+            <p className="aviso erro">{erro}</p>
+            <button className="botao secundario" onClick={() => window.location.reload()}>
+              Tentar de novo
+            </button>
+          </div>
+        ) : (
+          <p className="suave">Conferindo sua sessão…</p>
+        )}
+      </main>
+    </>
+  );
 }
 
 /**
@@ -45,6 +69,7 @@ export function Cabecalho({
   const router = useRouter();
 
   async function sair() {
+    marcarSaida();
     await api("/auth/sair", { corpo: {} }).catch(() => undefined);
     esquecerTokenDaAba();
     router.replace("/");

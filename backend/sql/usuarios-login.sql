@@ -28,6 +28,18 @@ end $$;
 alter table public.usuarios enable row level security;
 revoke all on public.usuarios from anon, authenticated;
 
+-- Sessões de login (o backend também cria ao subir): uma por entrada, com o hash do token.
+create table if not exists public.sessoes (
+  hash         text primary key,
+  usuario_id   text not null references public.usuarios(id) on delete cascade,
+  criada_em    timestamptz not null default now(),
+  expira_em    timestamptz not null,
+  encerrada_em timestamptz
+);
+create index if not exists sessoes_usuario on public.sessoes (usuario_id);
+alter table public.sessoes enable row level security;
+revoke all on public.sessoes from anon, authenticated;
+
 -- As senhas não se criam aqui (o hash é feito pelo app). Com o backend ligado neste banco:
 --   npm run definir-senha -- ana      (mostra o e-mail e a senha uma vez)
 -- ou, em desenvolvimento, o backend cria para quem não tiver e mostra no terminal ao subir.

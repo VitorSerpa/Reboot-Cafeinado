@@ -39,9 +39,15 @@ cd backend
 npm run definir-senha -- ana
 ```
 
-`definir-senha` troca a senha (e aceita um e-mail: `-- ana ana@empresa.com`), `listar-usuarios` mostra quem tem senha e `criar-usuario -- <id> "<Nome>" <solicitante|analista> [e-mail]` cria outro usuário.
+`definir-senha` troca a senha por uma aleatória ou pela escolhida (`-- ana --senha=12345`; mínimo de 5 caracteres no protótipo) e aceita um e-mail (`-- ana ana@empresa.com`), `listar-usuarios` mostra quem tem senha e `criar-usuario -- <id> "<Nome>" <solicitante|analista> [e-mail]` cria outro usuário.
 
 Cada aba guarda a própria sessão: dá para deixar o suporte na triagem numa aba e o solicitante em outra, no mesmo navegador.
+
+As telas e a API são protegidas pelo login:
+
+- sem sessão, `/chamado` e `/triagem` voltam para a tela de entrada, e nada da tela aparece antes de a sessão ser conferida;
+- o solicitante não abre a triagem e o suporte não abre chamados nem responde ao assistente no lugar do solicitante (403 na API e no WebSocket);
+- cada login é uma sessão na tabela `sessoes` (8 h). **Sair** encerra a sessão no banco e derruba o WebSocket dela, e trocar a senha encerra todas as sessões do usuário. A aba que perde a sessão volta sozinha para o login.
 
 - **Sem `.env`, o backend usa o Hub simulado:** respostas fixas, sem chave e sem custo. O cabeçalho mostra "Hub: simulado".
 - **Banco:** Postgres embutido (PGlite), em `~/.reboot-cafeinado/pgdata`, fora do OneDrive. Para usar o Supabase (ou outro Postgres), preencha `DATABASE_URL`: veja [Banco no Supabase](#banco-no-supabase). Para zerar os dados, apague essa pasta com o backend parado.
@@ -50,7 +56,7 @@ Cada aba guarda a própria sessão: dá para deixar o suporte na triagem numa ab
 
 O backend tem um servidor socket.io (`/socket.io`, porta 3333) com o namespace:
 
-- **`/chamados`**: o Chamado Pronto. O handshake usa o mesmo cookie de sessão da API; sem sessão, a conexão é recusada. Cada usuário fica na sala `usuario:<id>`, e cada analista também na sala `triagem:<empresa>`.
+- **`/chamados`**: o Chamado Pronto. O handshake usa a mesma sessão da API (token da aba ou cookie); sem sessão, a conexão é recusada, e sair derruba a conexão aberta. Cada usuário fica na sala `usuario:<id>`, e cada analista também na sala `triagem:<empresa>`.
 
 | Evento | Direção | O que faz |
 |---|---|---|
@@ -260,7 +266,7 @@ Estas regras ficam em `backend/src/dominio/contrato.ts`, com testes em `npm test
 
 ## Limitações do protótipo
 
-- A sessão da aba é um token assinado (8 h) guardado no `sessionStorage`, com o cookie de reserva. Sair apaga os dois, mas não há lista de sessões para derrubar de outro lugar.
+- As sessões vencem 8 horas depois do login, sem renovar com o uso. Não há tela para ver ou encerrar as sessões abertas: trocar a senha (`definir-senha`) encerra todas.
 - Uma empresa só (Aurora). As tabelas já separam por empresa.
 - O texto do agente aparece inteiro ao final do turno, não aos poucos: ele responde em JSON, que só vale depois de validado. O que chega ao vivo é a fase do agente.
 - O barramento de eventos fica em memória: com mais de uma instância do backend, seria preciso um adapter do socket.io (Redis, por exemplo).

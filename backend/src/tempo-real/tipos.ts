@@ -38,4 +38,6 @@ export interface ClienteParaServidor {
 
 export interface DadosSocket {
   usuario: Usuario;
+  /** Hash da sessão do handshake: sair derruba só os sockets dela. */
+  sessao: string;
 }

@@ -13,34 +13,53 @@ import { ErroApp } from "../dominio/erros.js";
 import * as triagem from "../dominio/triagem.js";
 import * as autenticacao from "../dominio/autenticacao.js";
 import {
-  buscarUsuario,
+  abrirSessao,
   CABECALHO_SESSAO,
   COOKIE_SESSAO as COOKIE,
   DURACAO_SESSAO_MS,
-  idDoToken,
-  tokenDaSessao,
+  encerrarSessao,
+  usuarioDaSessao,
   type Usuario,
 } from "../dominio/usuarios.js";
 
 declare module "express-serve-static-core" {
   interface Request {
     usuario?: Usuario;
+    sessao?: string;
   }
 }
 
+/** Token da aba (cabeçalho `x-sessao`) ou, sem ele, o do cookie. O da aba vem antes: o cookie é um só por navegador. */
+const tokenDe = (req: Request) => {
+  const cabecalho = req.headers[CABECALHO_SESSAO];
+  return typeof cabecalho === "string" && cabecalho ? cabecalho : req.cookies?.[COOKIE];
+};
+
 /**
- * Resolve o usuário pelo token da aba (cabeçalho `x-sessao`) ou, sem ele, pelo cookie assinado.
- * O token vem antes porque o cookie é um só por navegador: com ele, cada aba fica com o próprio usuário.
- * A empresa sai sempre daqui, nunca do navegador.
+ * Só passa com uma sessão aberta no banco (login feito, dentro das 8 horas, sem ter saído).
+ * A empresa e o perfil saem sempre daqui, nunca do navegador.
  */
 async function exigirLogin(req: Request, _res: Response, next: NextFunction) {
-  const cabecalho = req.headers[CABECALHO_SESSAO];
-  const id = cabecalho ? idDoToken(cabecalho) : req.signedCookies?.[COOKIE];
-  const usuario = typeof id === "string" ? await buscarUsuario(id) : undefined;
-  if (!usuario) return next(new ErroApp(401, "sem_sessao", "Entre com seu e-mail e senha."));
+  const token = tokenDe(req);
+  const usuario = await usuarioDaSessao(token);
+  if (!usuario) return next(new ErroApp(401, "sem_sessao", "Sua sessão terminou. Entre com seu e-mail e senha."));
   req.usuario = usuario;
+  req.sessao = token;
   next();
 }
+
+/** Depois de `exigirLogin`: só o tipo de login certo (o suporte é o perfil `analista`). */
+const exigirPerfil = (perfil: Usuario["perfil"]) => (req: Request, _res: Response, next: NextFunction) =>
+  req.usuario?.perfil === perfil
+    ? next()
+    : next(new ErroApp(403, "perfil", perfil === "analista" ? "Só o suporte acessa a triagem." : "Só solicitantes acessam esta área."));
+
+const OPCOES_COOKIE = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: env.nodeEnv === "production",
+  path: "/",
+};
 
 const idDe = (req: Request) => {
   const id = Number(req.params.id);
@@ -65,24 +84,23 @@ rotas.post("/auth/entrar", async (req, res) => {
     throw new ErroApp(400, "perfil", "Tipo de login inválido.");
   }
   const usuario = await autenticacao.entrar(email, senha, perfil);
-  res.cookie(COOKIE, usuario.id, {
-    signed: true,
-    httpOnly: true,
-    sameSite: "lax",
-    secure: env.nodeEnv === "production",
-    maxAge: DURACAO_SESSAO_MS,
-  });
-  res.json({ ...usuario, token: tokenDaSessao(usuario.id) });
+  const token = await abrirSessao(usuario.id);
+  res.cookie(COOKIE, token, { ...OPCOES_COOKIE, maxAge: DURACAO_SESSAO_MS });
+  res.json({ ...usuario, token });
 });
 
-rotas.post("/auth/sair", (_req, res) => {
-  res.clearCookie(COOKIE);
+// Encerra a sessão desta aba no banco: o token deixa de valer mesmo que alguém o tenha guardado.
+rotas.post("/auth/sair", async (req, res) => {
+  const token = tokenDe(req);
+  if (typeof token === "string" && token) await encerrarSessao(token);
+  // O cookie só sai se for desta mesma sessão: o de outra aba (outro usuário) continua.
+  if (!req.cookies?.[COOKIE] || req.cookies[COOKIE] === token) res.clearCookie(COOKIE, OPCOES_COOKIE);
   res.json({ ok: true });
 });
 
-// O token novo deixa a aba presa a este usuário, mesmo que ela tenha chegado só com o cookie.
+// Devolve o token da sessão usada: a aba que chegou só com o cookie passa a ficar presa a este usuário.
 rotas.get("/auth/me", exigirLogin, (req, res) => {
-  res.json({ ...req.usuario, hub: env.hub.modo, token: tokenDaSessao(req.usuario!.id) });
+  res.json({ ...req.usuario, hub: env.hub.modo, token: req.sessao });
 });
 
 // --- catálogo da empresa do usuário ---
@@ -126,7 +144,10 @@ rotas.post("/admin/usuarios", soLocal, async (req, res) => {
 
 rotas.post("/admin/usuarios/:id/senha", soLocal, async (req, res) => {
   res.json(
-    await autenticacao.definirSenha(String(req.params.id), { email: req.body?.email ? String(req.body.email) : undefined }),
+    await autenticacao.definirSenha(String(req.params.id), {
+      email: req.body?.email ? String(req.body.email) : undefined,
+      senha: req.body?.senha ? String(req.body.senha) : undefined,
+    }),
   );
 });
 
@@ -173,11 +194,11 @@ rotas.post("/admin/catalogo/:empresa/exportar", soLocal, async (req, res) => {
 });
 
 // --- jornada do solicitante ---
-rotas.get("/chamados", exigirLogin, async (req, res) => {
+rotas.get("/chamados", exigirLogin, exigirPerfil("solicitante"), async (req, res) => {
   res.json(await chamados.meusChamados(req.usuario!));
 });
 
-rotas.post("/chamados", exigirLogin, async (req, res) => {
+rotas.post("/chamados", exigirLogin, exigirPerfil("solicitante"), async (req, res) => {
   res.status(201).json(await chamados.abrirChamado(req.usuario!, String(req.body?.texto ?? "")));
 });
 
@@ -186,27 +207,27 @@ rotas.get("/chamados/:id", exigirLogin, async (req, res) => {
   res.json({ chamado: c, turnos: await chamados.turnos(c.id) });
 });
 
-rotas.post("/chamados/:id/mensagens", exigirLogin, async (req, res) => {
+rotas.post("/chamados/:id/mensagens", exigirLogin, exigirPerfil("solicitante"), async (req, res) => {
   res.json(await chamados.responder(req.usuario!, idDe(req), String(req.body?.texto ?? "")));
 });
 
-rotas.post("/chamados/:id/contingencia", exigirLogin, async (req, res) => {
+rotas.post("/chamados/:id/contingencia", exigirLogin, exigirPerfil("solicitante"), async (req, res) => {
   res.json(await chamados.contingencia(req.usuario!, idDe(req), req.body?.campos ?? {}));
 });
 
 // --- triagem ---
-rotas.get("/triagem", exigirLogin, async (req, res) => {
+rotas.get("/triagem", exigirLogin, exigirPerfil("analista"), async (req, res) => {
   res.json(await triagem.fila(req.usuario!));
 });
 
-rotas.get("/triagem/:id", exigirLogin, async (req, res) => {
+rotas.get("/triagem/:id", exigirLogin, exigirPerfil("analista"), async (req, res) => {
   res.json(await triagem.detalhe(req.usuario!, idDe(req)));
 });
 
-rotas.post("/triagem/:id/confirmar", exigirLogin, async (req, res) => {
+rotas.post("/triagem/:id/confirmar", exigirLogin, exigirPerfil("analista"), async (req, res) => {
   res.json(await triagem.confirmar(req.usuario!, idDe(req)));
 });
 
-rotas.post("/triagem/:id/corrigir", exigirLogin, async (req, res) => {
+rotas.post("/triagem/:id/corrigir", exigirLogin, exigirPerfil("analista"), async (req, res) => {
   res.json(await triagem.corrigir(req.usuario!, idDe(req), String(req.body?.fila ?? ""), String(req.body?.motivo ?? "")));
 });
