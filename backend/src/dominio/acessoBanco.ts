@@ -15,7 +15,7 @@ import { ErroApp } from "./erros.js";
 
 const SLUG = /^[a-z][a-z0-9_]{1,30}$/;
 
-export const VISOES = ["contexto", "empresa", "filas", "aplicacoes", "categorias", "procedimentos", "chamados_recentes"] as const;
+export const VISOES = ["contexto", "empresa", "filas", "servicos", "categorias", "procedimentos", "chamados_recentes"] as const;
 
 export function nomeAcesso(empresa: string) {
   if (!SLUG.test(empresa)) throw new ErroApp(400, "empresa", `Empresa inválida: "${empresa}".`);
@@ -38,8 +38,8 @@ create view ${s}.empresa with (security_barrier) as
 create view ${s}.filas with (security_barrier) as
   select slug, nome, escopo from public.filas where empresa_id = ${e};
 
-create view ${s}.aplicacoes with (security_barrier) as
-  select slug, nome, uso, acesso, apelidos, observacao from public.aplicacoes where empresa_id = ${e};
+create view ${s}.servicos with (security_barrier) as
+  select slug, nome, uso, acesso, apelidos, observacao from public.servicos where empresa_id = ${e};
 
 create view ${s}.categorias with (security_barrier) as
   select slug, nome, fila_padrao, ${lista("discriminadores")} as discriminadores,
@@ -67,7 +67,7 @@ create view ${s}.contexto with (security_barrier) as
   select jsonb_build_object(
     'empresa',       (select to_jsonb(x) from ${s}.empresa x),
     'filas',         (select coalesce(jsonb_agg(to_jsonb(x) order by x.nome), '[]') from ${s}.filas x),
-    'aplicacoes',    (select coalesce(jsonb_agg(to_jsonb(x) order by x.nome), '[]') from ${s}.aplicacoes x),
+    'servicos',      (select coalesce(jsonb_agg(to_jsonb(x) order by x.nome), '[]') from ${s}.servicos x),
     'categorias',    (select coalesce(jsonb_agg(to_jsonb(x) order by x.slug), '[]') from ${s}.categorias x),
     'procedimentos', (select coalesce(jsonb_agg(to_jsonb(x) order by x.slug), '[]') from ${s}.procedimentos x)
   ) as contexto;

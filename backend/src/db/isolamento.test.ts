@@ -45,7 +45,7 @@ test("na empresa, o banco só devolve as linhas dela, mesmo sem where", async ()
     assert.deepEqual(daFila.map((c) => c.empresa_id), ["vitalis"]);
     const conversa = await db.query<{ texto: string }>("select texto from turnos");
     assert.deepEqual(conversa.map((t) => t.texto), ["turno vitalis"]);
-    for (const tabela of ["usuarios", "filas", "aplicacoes", "categorias", "procedimentos"]) {
+    for (const tabela of ["usuarios", "filas", "servicos", "categorias", "procedimentos"]) {
       const linhas = await db.query<{ empresa_id: string }>(`select empresa_id from ${tabela}`);
       assert.ok(linhas.length > 0, tabela);
       assert.ok(linhas.every((l) => l.empresa_id === "vitalis"), tabela);

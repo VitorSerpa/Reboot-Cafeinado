@@ -112,8 +112,8 @@ rotas.get("/auth/me", exigirLogin, (req, res) => {
 // --- catálogo da empresa do usuário ---
 rotas.get("/catalogo", exigirLogin, async (req, res) => {
   const empresa = req.usuario!.empresa_id;
-  const [filas, aplicacoes] = await Promise.all([catalogo.filas(empresa), catalogo.aplicacoes(empresa)]);
-  res.json({ filas, aplicacoes: aplicacoes.map((a) => ({ ...a, apelidos: a.apelidos.join(", ") })) });
+  const [filas, servicos] = await Promise.all([catalogo.filas(empresa), catalogo.servicos(empresa)]);
+  res.json({ filas, servicos: servicos.map((s) => ({ ...s, apelidos: s.apelidos.join(", ") })) });
 });
 
 // --- administração do catálogo e dos tokens: só da própria máquina (loopback) ---

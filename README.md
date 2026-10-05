@@ -147,7 +147,7 @@ O app não usa a Data API do Supabase, que publica o schema `public`. Por isso t
 
 O agente escreve o SQL, então o Hub **nunca** recebe o usuário `postgres` do app. Cada empresa tem um usuário próprio, só de leitura:
 
-- **schema `hub_aurora`**, com views só da Aurora: `contexto` (uma linha com tudo em JSON), `empresa`, `filas`, `aplicacoes`, `categorias`, `procedimentos` e `chamados_recentes` (os últimos 7 dias, sem quem abriu);
+- **schema `hub_aurora`**, com views só da Aurora: `contexto` (uma linha com tudo em JSON), `empresa`, `filas`, `servicos`, `categorias`, `procedimentos` e `chamados_recentes` (os últimos 7 dias, sem quem abriu);
 - **usuário `hub_aurora`**, que só enxerga esse schema: não lê as tabelas do app (chamados, usuários, tokens) nem as de outra empresa, e não escreve em nada. Tem limite de 5 conexões e consultas de até 5 s.
 
 ```bash
@@ -181,7 +181,7 @@ No agente, use o prompt `hub/prompt-qualificador-aurora-v4-banco.md`. No primeir
 |---|---|---|
 | `obterContexto` | `GET /hub/v1/contexto` | Tudo da empresa numa chamada (~9 KB) |
 | `obterCategoria` | `GET /hub/v1/categorias/{slug}` | Ficha de uma categoria |
-| `buscarAplicacao` | `GET /hub/v1/aplicacoes?busca=portal` | Resolve nome ou apelido; avisa quando está fora do catálogo |
+| `buscarServico` | `GET /hub/v1/servicos?busca=portal` | Resolve nome ou apelido; avisa quando está fora do catálogo |
 | `listarChamadosAbertos` | `GET /hub/v1/chamados-abertos?aplicacao=pagaflow` | Outros chamados recentes da mesma aplicação (abrangência) |
 
 ### Testar o conector de API localmente

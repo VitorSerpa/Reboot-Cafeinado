@@ -110,5 +110,5 @@ export interface CampoContingencia {
 
 export interface Catalogo {
   filas: { slug: string; nome: string; escopo: string }[];
-  aplicacoes: { slug: string; nome: string; apelidos: string }[];
+  servicos: { slug: string; nome: string; apelidos: string }[];
 }

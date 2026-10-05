@@ -55,7 +55,22 @@ create table if not exists filas (
   primary key (empresa_id, slug)
 );
 
-create table if not exists aplicacoes (
+-- O catálogo chama de "serviços" o que antes eram "aplicações": os sistemas e serviços que a empresa usa.
+-- Banco antigo: renomeia. Banco em que a renomeação foi feita à mão e a tabela antiga voltou: junta e apaga a antiga
+-- (as views do Hub que dependiam dela caem junto e são recriadas na subida, em acessoBanco.atualizarVisoes).
+do $$
+begin
+  if to_regclass('public.aplicacoes') is not null and to_regclass('public.servicos') is null then
+    alter table public.aplicacoes rename to servicos;
+  elsif to_regclass('public.aplicacoes') is not null then
+    insert into public.servicos (empresa_id, slug, nome, apelidos, uso, acesso, observacao)
+      select empresa_id, slug, nome, apelidos, uso, acesso, observacao from public.aplicacoes
+      on conflict (empresa_id, slug) do nothing;
+    drop table public.aplicacoes cascade;
+  end if;
+end $$;
+
+create table if not exists servicos (
   empresa_id  text not null references empresas(id),
   slug        text not null,
   nome        text not null,
@@ -77,9 +92,9 @@ create table if not exists tokens_conector (
 
 -- Contexto completo da empresa: é a fonte da verdade que o agente consulta pelo conector (/hub/v1).
 alter table empresas   add column if not exists descricao   text not null default '';
-alter table aplicacoes add column if not exists uso         text not null default '';
-alter table aplicacoes add column if not exists acesso      text not null default '';
-alter table aplicacoes add column if not exists observacao  text not null default '';
+alter table servicos   add column if not exists uso         text not null default '';
+alter table servicos   add column if not exists acesso      text not null default '';
+alter table servicos   add column if not exists observacao  text not null default '';
 
 create table if not exists categorias (
   empresa_id            text not null references empresas(id),
@@ -176,7 +191,7 @@ alter table empresas add constraint empresas_status_check check (status in ('imp
  * O Hub lê o banco por outro caminho: views só leitura no schema hub_<empresa> (dominio/acessoBanco.ts).
  */
 export const TABELAS = [
-  "empresas", "usuarios", "sessoes", "filas", "aplicacoes", "tokens_conector",
+  "empresas", "usuarios", "sessoes", "filas", "servicos", "tokens_conector",
   "categorias", "procedimentos", "chamados", "turnos", "triagens",
 ] as const;
 
@@ -195,7 +210,7 @@ end $$;
 `;
 
 /** Tabelas com `empresa_id`: a política compara com a empresa do contexto. Turnos e triagens vão pelo chamado. */
-const COM_EMPRESA = ["usuarios", "filas", "aplicacoes", "categorias", "procedimentos", "chamados", "tokens_conector"] as const;
+const COM_EMPRESA = ["usuarios", "filas", "servicos", "categorias", "procedimentos", "chamados", "tokens_conector"] as const;
 const PELO_CHAMADO = ["turnos", "triagens"] as const;
 
 const politica = (tabela: string, condicao: string) => `
@@ -227,7 +242,7 @@ end $$;
 
 grant usage on schema public to app_runtime;
 revoke all on ${TABELAS.map((t) => `public.${t}`).join(", ")} from app_runtime;
-grant select on public.empresas, public.filas, public.aplicacoes, public.categorias, public.procedimentos to app_runtime;
+grant select on public.empresas, public.filas, public.servicos, public.categorias, public.procedimentos to app_runtime;
 grant select (id, empresa_id, nome, perfil) on public.usuarios to app_runtime;
 grant select, insert, update on public.chamados to app_runtime;
 grant select, insert on public.turnos, public.triagens to app_runtime;
