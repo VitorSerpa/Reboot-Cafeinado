@@ -12,6 +12,8 @@
  *   npm run revogar-acesso-banco -- aurora        → bloqueia esse usuário
  *   npm run listar-usuarios                       → quem pode entrar (e-mail, último login, bloqueio), sem segredo
  *   npm run definir-senha -- <usuário> [e-mail] [--senha=<valor>]  → senha nova para o login (gerada, ou a escolhida)
+ *   npm run definir-senha -- <usuário> --digitar  → você digita a senha (não aparece na tela nem no histórico)
+ *   npm run definir-senha -- --todos [--empresa <empresa>]  → você digita UMA senha para todos (ou só os da empresa)
  *   npm run criar-usuario -- <id> "<Nome>" <solicitante|analista> [e-mail]  → usuário novo na Aurora, já com senha
  *   npm run definir-agente -- aurora [uuid]       → mostra ou troca o agente da empresa (no banco: vale para todo o time)
  *   npm run listar-empresas                       → empresas, status e o que falta em cada uma
@@ -30,6 +32,30 @@ function mostrarLogin(l: { usuario: string; nome: string; perfil: string; email:
   console.log("Para trocar depois: npm run definir-senha -- " + l.usuario);
 }
 const base = `http://localhost:${env.port}/api/admin`;
+
+/** Lê uma linha do terminal sem mostrar o que é digitado. */
+async function lerEscondido(rotulo: string): Promise<string> {
+  const { createInterface } = await import("node:readline");
+  process.stdout.write(rotulo);
+  const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+  (rl as unknown as { _writeToOutput: (s: string) => void })._writeToOutput = () => {};
+  return new Promise((resolve) =>
+    rl.question("", (valor) => {
+      rl.close();
+      process.stdout.write("\n");
+      resolve(valor);
+    }),
+  );
+}
+
+/** Pede a senha duas vezes, sem mostrar na tela. */
+async function pedirSenha() {
+  if (!process.stdin.isTTY) throw new Error("Rode num terminal: a senha é digitada, sem aparecer na tela.");
+  const senha = await lerEscondido("Senha nova: ");
+  if (senha.length < 5) throw new Error("A senha precisa de pelo menos 5 caracteres.");
+  if ((await lerEscondido("Repita a senha: ")) !== senha) throw new Error("As duas senhas não conferem. Nada mudou.");
+  return senha;
+}
 
 async function chamar(metodo: "GET" | "POST", rota: string, corpo?: unknown) {
   const resposta = await fetch(base + rota, {
@@ -114,10 +140,28 @@ try {
       break;
     }
     case "definir-senha": {
-      if (!arg) throw new Error("Informe o usuário (veja em npm run listar-usuarios).");
-      // `--senha=<valor>` escolhe a senha; sem ele, o backend gera uma aleatória.
-      const senha = process.argv.find((a) => a.startsWith("--senha="))?.slice("--senha=".length);
+      const opcoes = process.argv.slice(3);
+      // `--todos [--empresa x]`: uma senha digitada (sem aparecer) para todos, ou para os da empresa.
+      if (opcoes.includes("--todos")) {
+        const i = opcoes.indexOf("--empresa");
+        const empresa = i >= 0 ? opcoes[i + 1] : undefined;
+        const feitos = await chamar("POST", "/usuarios/senha", { senha: await pedirSenha(), empresa });
+        console.log(`Senha definida para ${feitos.length} usuário(s)${empresa ? ` da empresa ${empresa}` : ""}. As sessões abertas deles caíram.`);
+        for (const u of feitos) console.log(`  ${u.perfil === "analista" ? "suporte    " : "solicitante"}  ${u.email}`);
+        break;
+      }
+      if (!arg || arg.startsWith("--")) {
+        throw new Error("Uso: npm run definir-senha -- <usuário> [e-mail] [--digitar | --senha=<valor>]   ou   -- --todos [--empresa <empresa>]");
+      }
       const email = descricao && !descricao.startsWith("--") ? descricao : undefined;
+      // `--digitar`: você digita a senha, sem aparecer. `--senha=<valor>`: a escolhida (fica no histórico do terminal).
+      // Sem nenhum dos dois, o backend gera uma aleatória e mostra uma vez.
+      if (opcoes.includes("--digitar")) {
+        const r = await chamar("POST", `/usuarios/${encodeURIComponent(arg)}/senha`, { email, senha: await pedirSenha() });
+        console.log(`Senha definida para ${r.nome} (${r.email}). As sessões abertas caíram.`);
+        break;
+      }
+      const senha = opcoes.find((a) => a.startsWith("--senha="))?.slice("--senha=".length);
       mostrarLogin(await chamar("POST", `/usuarios/${encodeURIComponent(arg)}/senha`, { email, senha }));
       break;
     }

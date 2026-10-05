@@ -149,6 +149,13 @@ rotas.post("/admin/usuarios", soLocal, async (req, res) => {
   );
 });
 
+// A mesma senha, escolhida por quem administra, para todos (ou para os de uma empresa). A senha não volta na resposta.
+rotas.post("/admin/usuarios/senha", soLocal, async (req, res) => {
+  res.json(
+    await autenticacao.definirSenhaDeTodos(String(req.body?.senha ?? ""), req.body?.empresa ? String(req.body.empresa) : undefined),
+  );
+});
+
 rotas.post("/admin/usuarios/:id/senha", soLocal, async (req, res) => {
   res.json(
     await autenticacao.definirSenha(String(req.params.id), {

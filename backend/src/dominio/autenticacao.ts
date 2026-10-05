@@ -126,6 +126,25 @@ export async function definirSenha(usuarioId: string, opcoes: { email?: string; 
   return { usuario: usuario.id, nome: usuario.nome, perfil: usuario.perfil, email, senha };
 }
 
+/**
+ * A mesma senha para todos os usuários (ou só os de uma empresa), escolhida por quem administra: para o ambiente de
+ * demonstração. Encerra as sessões de cada um. A senha não volta na resposta.
+ */
+export async function definirSenhaDeTodos(senha: string, empresa?: string) {
+  if (senha.length < SENHA_MIN) throw new ErroApp(400, "senha", `A senha precisa de pelo menos ${SENHA_MIN} caracteres.`);
+  const usuarios = await db.query<{ id: string }>(
+    `select id from usuarios ${empresa ? "where empresa_id = $1" : ""} order by empresa_id, perfil desc, id`,
+    empresa ? [empresa] : [],
+  );
+  if (!usuarios.length) throw new ErroApp(404, "usuarios", empresa ? `Nenhum usuário na empresa "${empresa}".` : "Nenhum usuário.");
+  const feitos = [];
+  for (const u of usuarios) {
+    const { usuario, nome, perfil, email } = await definirSenha(u.id, { senha });
+    feitos.push({ usuario, nome, perfil, email });
+  }
+  return feitos;
+}
+
 /** Cria um usuário na empresa (ou atualiza nome e perfil) e já define a senha. */
 export async function criarUsuario(dados: { id: string; nome: string; perfil: string; empresa: string; email?: string }) {
   const id = dados.id.trim().toLowerCase();

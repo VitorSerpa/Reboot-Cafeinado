@@ -8,7 +8,7 @@ process.env.HUB_MODE = "simulado";
 const { comoSistema, db, fecharBanco, iniciarBanco } = await import("../db/index.js");
 const empresas = await import("./empresas.js");
 const { definirAgente } = await import("./agentes.js");
-const { definirSenha, entrar } = await import("./autenticacao.js");
+const { definirSenha, definirSenhaDeTodos, entrar } = await import("./autenticacao.js");
 const { abrirSessao, usuarioDaSessao } = await import("./usuarios.js");
 const { notaDoSistema } = await import("./chamados.js");
 
@@ -104,6 +104,17 @@ test("empresa suspensa: ninguém entra, e quem estava dentro sai", async () => {
 
     await empresas.definirStatus("horizonte", "ativa");
     assert.equal((await entrar(email, senha)).empresa_id, "horizonte");
+  });
+});
+
+test("senha escolhida para todos de uma empresa: entra com ela, e a senha não volta na resposta", async () => {
+  await comoSistema(async () => {
+    const feitos = await definirSenhaDeTodos("senha-comum", "vitalis");
+    assert.deepEqual(feitos.map((u) => u.usuario).sort(), ["diego", "paula", "renata"]);
+    assert.ok(feitos.every((u) => !("senha" in u)));
+    assert.equal((await entrar("renata@vitalis.test", "senha-comum")).empresa_id, "vitalis");
+    await assert.rejects(() => definirSenhaDeTodos("abc"), /pelo menos/);
+    await assert.rejects(() => definirSenhaDeTodos("senha-comum", "inexistente"), /Nenhum usuário/);
   });
 });
 
