@@ -216,9 +216,13 @@ begin
     create role app_runtime nologin noinherit;
   end if;
   -- Quem roda as migrações (o dono das tabelas) precisa poder assumir o papel: SET ROLE app_runtime.
-  if not pg_has_role(current_user, 'app_runtime', 'member') then
-    execute format('grant app_runtime to %I', current_user);
-  end if;
+  -- No Postgres 16+, criar o papel só dá o direito de administrá-lo, não o de assumi-lo (no Supabase, o postgres
+  -- não é superusuário): a concessão precisa do WITH SET TRUE. Conceder de novo só atualiza a opção.
+  begin
+    execute format('grant app_runtime to %I with set true', current_user);
+  exception when syntax_error then
+    execute format('grant app_runtime to %I', current_user); -- Postgres 15 ou anterior
+  end;
 end $$;
 
 grant usage on schema public to app_runtime;
