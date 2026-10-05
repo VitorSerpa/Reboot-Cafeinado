@@ -142,7 +142,7 @@ export default function AbrirChamado() {
 
   const chamado = estado?.chamado;
   const r = chamado?.resultado;
-  const nomeApp = (slug: string | null) => catalogo?.aplicacoes.find((a) => a.slug === slug)?.nome ?? slug;
+  const nomeApp = (slug: string | null) => catalogo?.servicos.find((a) => a.slug === slug)?.nome ?? slug;
   /** O agente concluiu: a conversa agora é com o atendente. */
   const comSuporte = !!chamado && chamado.status !== "qualificando";
   // A mensagem pendente sai da tela quando o aviso do WebSocket já trouxe o turno gravado.
@@ -328,7 +328,7 @@ function FormularioContingencia({
           {c.tipo === "aplicacao" ? (
             <select className="campo" value={valores[c.chave] ?? ""} onChange={(e) => definir(c.chave, e.target.value)}>
               <option value="">Selecione…</option>
-              {catalogo?.aplicacoes.map((a) => (
+              {catalogo?.servicos.map((a) => (
                 <option key={a.slug} value={a.slug}>
                   {a.nome} ({a.apelidos})
                 </option>

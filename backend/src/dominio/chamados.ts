@@ -83,13 +83,29 @@ async function filasDaEmpresa(empresaId: string) {
   return db.query<{ slug: string; nome: string }>("select slug, nome from filas where empresa_id = $1", [empresaId]);
 }
 
-function montarMensagem(tipo: "relato" | "resposta", texto: string, perguntasFeitas: number) {
-  const cabecalho = tipo === "relato" ? "Relato inicial do solicitante:" : "Resposta do solicitante:";
+const HOJE = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  weekday: "long",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
+/**
+ * Nota do sistema no fim de cada mensagem ao agente: a data de hoje (sem ela, o agente não avalia prazos e janelas,
+ * como a de fechamento contábil) e quantas perguntas já foram feitas.
+ */
+export function notaDoSistema(perguntasFeitas: number, agora = new Date()) {
   const limite =
     perguntasFeitas >= TETO_PERGUNTAS
       ? ' Limite atingido: não faça mais perguntas; conclua com "pronto" ou "abstencao".'
       : "";
-  return `${cabecalho}\n${texto}\n\n[Sistema: perguntas já feitas: ${perguntasFeitas} de ${TETO_PERGUNTAS}.${limite}]`;
+  return `[Sistema: hoje é ${HOJE.format(agora)}. Perguntas já feitas: ${perguntasFeitas} de ${TETO_PERGUNTAS}.${limite}]`;
+}
+
+function montarMensagem(tipo: "relato" | "resposta", texto: string, perguntasFeitas: number) {
+  const cabecalho = tipo === "relato" ? "Relato inicial do solicitante:" : "Resposta do solicitante:";
+  return `${cabecalho}\n${texto}\n\n${notaDoSistema(perguntasFeitas)}`;
 }
 
 /** Chama o agente; se a resposta vier fora do formato, pede de novo uma vez na mesma sessão. */
@@ -122,7 +138,8 @@ async function rodarTurno(chamado: Chamado, mensagemAgente: string) {
   if (!empresa) throw new ErroApp(500, "empresa", "Empresa sem agente configurado.");
 
   // ID externo fixo do chamado: é ele que mantém a conversa na mesma sessão do Hub.
-  const sessaoExterna = chamado.hub_session_id ?? `chamado-${chamado.id}-${randomUUID()}`;
+  // A empresa vai no ID: com uma conta só no Hub, as sessões de todas as empresas aparecem juntas em Monitorar → Sessões.
+  const sessaoExterna = chamado.hub_session_id ?? `chamado-${chamado.empresa_id}-${chamado.id}-${randomUUID()}`;
   if (!chamado.hub_session_id) {
     await db.query("update chamados set hub_session_id = $2 where id = $1", [chamado.id, sessaoExterna]);
   }
@@ -139,6 +156,10 @@ async function rodarTurno(chamado: Chamado, mensagemAgente: string) {
   let resposta: Awaited<ReturnType<typeof chamarAgente>>;
   aoProgresso({ fase: "pensando" });
   try {
+    // Empresa ainda sem agente (em implantação): vira o formulário curto, e o chamado não se perde.
+    if (!empresa.agente_id) {
+      throw new HubIndisponivel("Empresa sem agente configurado", null, `npm run definir-agente -- ${chamado.empresa_id} <uuid>`);
+    }
     resposta = await chamarAgente(empresa.agente_id, mensagemAgente, sessaoExterna, aoProgresso);
   } catch (erro) {
     aoProgresso({ fase: "concluido" });

@@ -16,7 +16,7 @@ export const eFerramentaDeCatalogo = (nome: string) =>
   /^(list_files|describe_file|query_file|read_file)_/.test(nome) ||
   /^(show_tables|describe_table|summarize_table|inspect_query|run_query)(_|$)/.test(nome) ||
   /^postgres_[a-z0-9_]+$/.test(nome) ||
-  /(obter_?contexto|obter_?categoria|buscar_?aplicacao|listar_?chamados_?abertos)/i.test(nome);
+  /(obter_?contexto|obter_?categoria|buscar_?(aplicacao|servico)|listar_?chamados_?abertos)/i.test(nome);
 
 const normalizar = (s: string) =>
   s

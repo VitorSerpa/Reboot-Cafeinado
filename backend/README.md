@@ -66,13 +66,17 @@ separa as rotas do solicitante (`/chamados`, exceto o detalhe, que confere o don
 O domínio repete a checagem, porque o WebSocket não passa pelas rotas. `POST /api/auth/sair` encerra a sessão e
 derruba o socket dela; `definir-senha` encerra todas as sessões do usuário.
 
+Isolamento por empresa: toda consulta roda com um contexto (`comEmpresa` ou `comoSistema`, em `src/db/index.ts`). O
+`exigirLogin`, o conector `/hub/v1` e cada evento do socket entram com a empresa do usuário ou do token, e aí o banco
+filtra pelo RLS (papel `app_runtime`). O agente de cada empresa fica na tabela `empresas` (veja o README da raiz).
+
 ## Variáveis de ambiente
 
 | Var | Default | Descrição |
 | --- | --- | --- |
 | `PORT` | `3333` | Porta HTTP |
-| `NODE_ENV` | `development` | Em `development` o handler de erro devolve o stack, e o backend cria as senhas que faltam ao subir |
-| `CORS_ORIGIN` | `http://localhost:3000` | Origens permitidas (HTTP e WebSocket), separadas por vírgula |
+| `NODE_ENV` | `development` | Em `development` o handler de erro devolve o stack e aceita qualquer porta de `localhost` no CORS; com o banco local (PGlite), o backend também cria as senhas que faltam ao subir |
+| `CORS_ORIGIN` | `http://localhost:3000` | Origens permitidas (HTTP e WebSocket), separadas por vírgula. Em `development`, qualquer porta de `localhost` também |
 | `SESSION_SECRET` | `dev-somente-local` | Segredo do cookie-parser. A sessão não depende dele: fica na tabela `sessoes` |
 | `DATABASE_URL` | vazio | Postgres (Supabase). Vazio = PGlite em `PGLITE_DIR` |
 | `DATABASE_SSL_CA` | vazio | Certificado da CA do Supabase, para verificar o servidor |
@@ -80,5 +84,4 @@ derruba o socket dela; `definir-senha` encerra todas as sessões do usuário.
 | `HUB_MODE` | `real` com chave, senão `simulado` | `simulado` usa respostas fixas, sem custo |
 | `HUB_BASE_URL` | `https://belatrix.ai` | Endereço do Kaffa AI Hub |
 | `HUB_API_KEY` | vazio | Chave do Hub; com ela, o modo vira `real` |
-| `HUB_AGENTE_AURORA` | `06abc3a3-…` | Agente Qualificador Aurora |
 | `HUB_TIMEOUT_MS` | `90000` | Tempo máximo de um turno do agente |

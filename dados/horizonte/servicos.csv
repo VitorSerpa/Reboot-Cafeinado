@@ -1,0 +1,6 @@
+slug,nome,uso,acesso,apelidos,observacao
+portal-aluno,Portal do Aluno,"Matrícula, notas, boletos e requerimentos dos alunos",Web e app,"portal, área do aluno, app do aluno","A rematrícula só abre no período do calendário acadêmico. Fora dele, a opção não aparece: não é defeito."
+academus,Academus,"Sistema acadêmico da secretaria: diários, notas, históricos e certificados",Web,"sistema acadêmico, diário, academus",Lançamento de notas fecha 5 dias depois do fim da avaliação. Diário bloqueado depois do prazo é regra acadêmica.
+horizonte-cobranca,Horizonte Cobrança,"Mensalidades, boletos, acordos e bolsas",Web,"financeiro, boleto, cobrança, mensalidade",Boleto vencido há mais de 60 dias só é reemitido com acordo. Bolsa depende de aprovação da comissão.
+sala-virtual,Sala Virtual,"Ambiente virtual de aprendizagem: aulas, atividades e provas online",Web,"ava, moodle, sala virtual, ead",Prova online só fica aberta na janela definida pelo professor. Atividade fechada pelo prazo não é falha.
+protocolo-digital,Protocolo Digital,"Requerimentos e documentos: declarações, trancamento, segunda via",Web,"protocolo, requerimento, declaração",O prazo de resposta é de até 5 dias úteis. Requerimento em análise não é atraso do sistema.

@@ -42,7 +42,7 @@ const eCatalogo = (nome: string) =>
   /^(list_files|describe_file|query_file|read_file)_/.test(nome) ||
   /^(show_tables|describe_table|summarize_table|inspect_query|run_query)(_|$)/.test(nome) ||
   /^postgres_[a-z0-9_]+$/.test(nome) ||
-  /(obter_?contexto|obter_?categoria|buscar_?aplicacao|listar_?chamados_?abertos)/i.test(nome);
+  /(obter_?contexto|obter_?categoria|buscar_?(aplicacao|servico)|listar_?chamados_?abertos)/i.test(nome);
 
 const hora = (iso: string | null) => (iso ? new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—");
 
@@ -271,7 +271,7 @@ function PainelDetalhe({
   const outras = ferramentas.filter((c) => !eCatalogo(c.tool));
   const confianca = Math.round((r?.confianca ?? 0) * 100);
   const podeConfirmar = r?.status === "pronto" && !!r.fila_sugerida;
-  const nomeApp = (slug: string | null) => catalogo?.aplicacoes.find((a) => a.slug === slug)?.nome ?? slug ?? "—";
+  const nomeApp = (slug: string | null) => catalogo?.servicos.find((a) => a.slug === slug)?.nome ?? slug ?? "—";
 
   return (
     <div className="cartao pilha">

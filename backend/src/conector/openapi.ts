@@ -12,7 +12,7 @@ export function openapi(urlBase: string) {
       title: "Chamado Pronto: contexto da empresa",
       version: "1.0.0",
       description:
-        "Contexto de triagem de UMA empresa: aplicações, filas, categorias e procedimentos, vindos do banco do Chamado Pronto. " +
+        "Contexto de triagem de UMA empresa: serviços, filas, categorias e procedimentos, vindos do banco do Chamado Pronto. " +
         "A empresa é definida pelo token do conector; não é preciso (nem possível) escolher a empresa.",
     },
     servers: [{ url: urlBase }],
@@ -32,7 +32,7 @@ export function openapi(urlBase: string) {
           operationId: "obterContexto",
           summary: "Contexto completo da empresa numa chamada",
           description:
-            "Devolve empresa, filas, aplicações (com apelidos), categorias (com discriminadores, campos obrigatórios e regra de roteamento) " +
+            "Devolve empresa, filas, serviços (com apelidos), categorias (com discriminadores, campos obrigatórios e regra de roteamento) " +
             "e procedimentos de triagem. Chame UMA vez, no primeiro turno do chamado; o resultado continua na conversa.",
           responses: { "200": ok("Contexto da empresa"), "401": erro },
         },
@@ -46,14 +46,14 @@ export function openapi(urlBase: string) {
           responses: { "200": ok("Ficha da categoria"), "404": erro, "401": erro },
         },
       },
-      "/hub/v1/aplicacoes": {
+      "/hub/v1/servicos": {
         get: {
-          operationId: "buscarAplicacao",
-          summary: "Identificar a aplicação pelo nome ou apelido",
+          operationId: "buscarServico",
+          summary: "Identificar o serviço pelo nome ou apelido",
           description:
-            "Procura a aplicação pelo que o funcionário escreveu (nome, apelido ou uso). Se 'fora_do_catalogo' vier true, a aplicação não é da casa.",
+            "Procura o serviço pelo que o funcionário escreveu (nome, apelido ou uso). Se 'fora_do_catalogo' vier true, o serviço não é da casa.",
           parameters: [{ name: "busca", in: "query", required: true, schema: { type: "string" }, description: "Texto como o funcionário escreveu, ex.: 'portal'" }],
-          responses: { "200": ok("Aplicações encontradas, da mais para a menos relevante"), "400": erro, "401": erro },
+          responses: { "200": ok("Serviços encontrados, do mais para o menos relevante"), "400": erro, "401": erro },
         },
       },
       "/hub/v1/chamados-abertos": {

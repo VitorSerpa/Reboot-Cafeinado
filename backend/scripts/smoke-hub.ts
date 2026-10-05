@@ -1,12 +1,21 @@
 /**
  * Smoke test do agente real, sem banco nem app: dois turnos na mesma conversa.
- * Uso: npm run smoke-hub   (precisa de HUB_API_KEY no .env; gasta ~1–2 centavos de dólar)
+ * Uso: npm run smoke-hub [-- <empresa>]   (agente do dossiê dados/<empresa>/empresa.json; padrão aurora;
+ *      precisa de HUB_API_KEY no .env; gasta ~1–2 centavos de dólar)
  */
 import { randomUUID } from "node:crypto";
 
 import { env } from "../src/config/env.js";
 import { lerContrato } from "../src/dominio/contrato.js";
+import { lerDossie } from "../src/dominio/empresas.js";
 import { hubReal } from "../src/hub/runtime.js";
+
+const empresa = process.argv[2] ?? "aurora";
+const agenteId = lerDossie(empresa).agente_id;
+if (!agenteId) {
+  console.error(`O dossiê de ${empresa} ainda não tem agente_id (dados/${empresa}/empresa.json).`);
+  process.exit(1);
+}
 
 if (!env.hub.apiKey) {
   console.error("Preencha HUB_API_KEY no backend/.env antes de rodar.");
@@ -23,7 +32,7 @@ const turnos = [
 console.log(`ID externo da conversa: ${sessaoExterna}`);
 const sessoesHub: (string | null)[] = [];
 for (const [i, mensagem] of turnos.entries()) {
-  const r = await hubReal.conversar({ agenteId: env.hub.agenteAurora, mensagem, sessaoExterna });
+  const r = await hubReal.conversar({ agenteId, mensagem, sessaoExterna });
   sessoesHub.push(r.sessionId);
   const contrato = lerContrato(r.texto);
   const contagem = r.eventos.reduce<Record<string, number>>((acc, e) => ({ ...acc, [e]: (acc[e] ?? 0) + 1 }), {});

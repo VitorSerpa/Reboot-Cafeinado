@@ -1,0 +1,14 @@
+{
+  "nome": "Instituto Horizonte",
+  "mercado": "Instituição de ensino superior",
+  "area": "Secretaria acadêmica e Financeiro",
+  "descricao": "Faculdade com três campi e cursos presenciais e a distância. A secretaria acadêmica cuida de matrícula, notas, documentos e requerimentos; o financeiro, de mensalidades, boletos, acordos e bolsas.",
+  "dominio_email": "horizonte.test",
+  "agente_id": "06ac3d5c-e360-705d-8000-af9fbc92dbee",
+  "conector_slug": "postgres-horizonte",
+  "usuarios": [
+    { "id": "marcos", "nome": "Marcos Pereira", "perfil": "solicitante" },
+    { "id": "lucia", "nome": "Lúcia Fernandes", "perfil": "solicitante" },
+    { "id": "rafael", "nome": "Rafael Costa", "perfil": "analista" }
+  ]
+}

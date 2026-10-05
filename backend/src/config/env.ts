@@ -30,7 +30,6 @@ export const env = {
     modo: (hubModeExplicito || (hubApiKey ? "real" : "simulado")) as "real" | "simulado",
     baseUrl: (vazio(process.env.HUB_BASE_URL) || "https://belatrix.ai").replace(/\/+$/, ""),
     apiKey: hubApiKey,
-    agenteAurora: vazio(process.env.HUB_AGENTE_AURORA) || "06abc3a3-1c9f-785e-8000-519434bce89a",
     timeoutMs: Number(vazio(process.env.HUB_TIMEOUT_MS) || 90000),
   },
 };

@@ -30,9 +30,9 @@ npm install
 npm run dev
 ```
 
-Abra http://localhost:3000 e entre com e-mail e senha, escolhendo o tipo de login: **Solicitante** (abre chamado: Ana e Carlos) ou **Suporte** (triagem e resposta no chat: Bruna, perfil `analista` no banco). Entrar pelo tipo errado é recusado.
+Abra http://localhost:3000 (se a porta estiver ocupada, o Next sobe na 3001; em desenvolvimento o backend aceita qualquer porta de localhost) e entre com e-mail e senha, escolhendo o tipo de login: **Solicitante** (abre chamado) ou **Suporte** (triagem e resposta no chat, perfil `analista` no banco). Usuários de teste por empresa: Aurora, Ana e Carlos (suporte: Bruna); Vitalis, Paula e Diego (suporte: Renata); Horizonte, Marcos e Lúcia (suporte: Rafael). A empresa sai do login: cada um só vê a própria. Entrar pelo tipo errado é recusado.
 
-**Senhas:** ficam na própria tabela `usuarios` (colunas `email` e `senha_hash`, só o hash scrypt; 5 erros seguidos bloqueiam por 15 minutos). Em desenvolvimento, quem ainda não tem senha ganha uma ao subir o backend, e o terminal mostra **uma vez só** o e-mail (`<usuário>@aurora.test`) e a senha. Depois, com o backend rodando:
+**Senhas:** ficam na própria tabela `usuarios` (colunas `email` e `senha_hash`, só o hash scrypt; 5 erros seguidos bloqueiam por 15 minutos). Com o banco local (PGlite), em desenvolvimento, quem ainda não tem senha ganha uma ao subir o backend, e o terminal mostra **uma vez só** o e-mail (`<usuário>@<empresa>.test`) e a senha. **Com o Supabase, que o time compartilha, a subida não cria senhas**: elas ficariam só no terminal de quem subiu. Para criar ou trocar, com o backend rodando:
 
 ```bash
 cd backend
@@ -82,12 +82,46 @@ npm run smoke-chamados
 ## Ligar no agente real
 
 1. `cd backend` e copie `.env.example` para `.env`.
-2. Preencha `HUB_API_KEY=` com a sua chave. O agente já vem configurado em `HUB_AGENTE_AURORA`.
-3. Reinicie o backend. O terminal deve mostrar `Hub: real (https://belatrix.ai, agente 06abc3a3-…)`, e o cabeçalho do app, "Hub: real".
+2. Preencha `HUB_API_KEY=` com a sua chave.
+3. Reinicie o backend. O terminal deve mostrar `Hub: real (https://belatrix.ai, uma API Key da plataforma)` e a lista de empresas com o agente de cada uma, e o cabeçalho do app, "Hub: real".
+
+O agente de cada empresa fica no banco, e não no `.env`: veja [Empresas](#empresas-multiempresa).
+
+## Empresas (multiempresa)
+
+Cada empresa cliente é um registro na tabela `empresas`, que é o cadastro oficial. O app usa **uma conta só no Kaffa AI Hub, com uma API Key da plataforma**. Cada empresa tem lá o seu agente, o seu conector `postgres-<empresa>` e o seu usuário do banco `hub_<empresa>`, que só lê as views da empresa.
+
+**O isolamento é garantido pelo banco (RLS).** O backend atende cada requisição no papel `app_runtime`, com a empresa do usuário logado (`app.empresa_id`). O Postgres só devolve, e só aceita gravar, linhas dessa empresa: um `where empresa_id` esquecido no código não vaza nada. O papel não lê senha, e-mail, sessão nem token, e uma consulta sem empresa no contexto é recusada. Login, sessão, cadastro e administração rodam como a plataforma. Os testes estão em `backend/src/db/isolamento.test.ts` e `backend/src/rotas/multiempresa.test.ts`.
+
+**Dossiê:** `dados/<empresa>/empresa.json` (nome, mercado, área, descrição, domínio de e-mail, agente, slug do conector e usuários de teste), mais os 4 CSVs do catálogo e os roteiros de teste em `roteiros.md`. O dossiê é só a entrada: depois da primeira carga, quem manda é o banco, e rodar de novo não sobrescreve nada. Hoje há três: Aurora Distribuição (`aurora`), Rede Vitalis (`vitalis`) e Instituto Horizonte (`horizonte`).
+
+**Com o banco local (PGlite),** a subida importa todos os dossiês e cria as senhas, mostradas no terminal. **Com o Supabase, o cadastro é explícito**, com o backend rodando:
+
+```bash
+npm run provisionar -- vitalis
+```
+
+O comando é idempotente: rodar de novo só faz o que falta.
+1. Cadastra a empresa (status `implantacao`), os usuários e o catálogo.
+2. Cria as senhas de quem ainda não tem. Elas aparecem uma vez só.
+3. Cria o usuário só leitura do Hub (`hub_vitalis`) e as views. A senha aparece uma vez só.
+4. Gera o prompt do agente em `hub/prompts/vitalis.md`, a partir do modelo comum `hub/prompt-qualificador.modelo.md`, com o schema e a ferramenta da empresa.
+5. Mostra o que criar no Hub: o conector Database (PostgreSQL) `postgres-vitalis` e o agente "Qualificador Rede Vitalis".
+
+Depois de criar o agente no Hub, rode `npm run definir-agente -- vitalis <uuid>`. Com tudo pronto, o status passa a `ativa`. Enquanto a empresa não tem agente, os chamados dela vão para o formulário curto, e nada se perde.
+
+| Comando | O que faz |
+|---|---|
+| `npm run listar-empresas` | Empresas, status e o que falta em cada uma |
+| `npm run provisionar -- <empresa> [--recarregar-catalogo]` | Cadastra ou completa a empresa a partir do dossiê |
+| `npm run definir-agente -- <empresa> [uuid]` | Mostra ou troca o agente. Vale para todos que usam o banco, já no próximo turno |
+| `npm run status-empresa -- <empresa> suspensa` | Ninguém da empresa entra, as sessões caem na hora e o acesso do Hub é bloqueado |
+| `npm run status-empresa -- <empresa> ativa` | Reativa |
+| `npm run definir-conector -- <empresa> <slug>` | Grava o slug real do conector no Hub e gera de novo o prompt. O Hub deriva o slug do nome do conector e não deixa mudar depois: "Postgres Horizonte" vira `postgres-horizonte` |
 
 ## Contexto no banco
 
-O contexto da empresa (aplicações, filas, categorias e procedimentos) fica no **Postgres do app**. Os CSVs de `dados/aurora/` são só a carga inicial, feita na primeira vez que o backend sobe. Depois disso, quem manda é o banco.
+O contexto da empresa (aplicações, filas, categorias e procedimentos) fica no **Postgres do app**. Os CSVs de `dados/<empresa>/` são só a carga inicial, feita no provisionamento da empresa. Depois disso, quem manda é o banco.
 
 O agente lê esse contexto por um de três caminhos:
 
@@ -113,7 +147,7 @@ O app não usa a Data API do Supabase, que publica o schema `public`. Por isso t
 
 O agente escreve o SQL, então o Hub **nunca** recebe o usuário `postgres` do app. Cada empresa tem um usuário próprio, só de leitura:
 
-- **schema `hub_aurora`**, com views só da Aurora: `contexto` (uma linha com tudo em JSON), `empresa`, `filas`, `aplicacoes`, `categorias`, `procedimentos` e `chamados_recentes` (os últimos 7 dias, sem quem abriu);
+- **schema `hub_aurora`**, com views só da Aurora: `contexto` (uma linha com tudo em JSON), `empresa`, `filas`, `servicos`, `categorias`, `procedimentos` e `chamados_recentes` (os últimos 7 dias, sem quem abriu);
 - **usuário `hub_aurora`**, que só enxerga esse schema: não lê as tabelas do app (chamados, usuários, tokens) nem as de outra empresa, e não escreve em nada. Tem limite de 5 conexões e consultas de até 5 s.
 
 ```bash
@@ -147,7 +181,7 @@ No agente, use o prompt `hub/prompt-qualificador-aurora-v4-banco.md`. No primeir
 |---|---|---|
 | `obterContexto` | `GET /hub/v1/contexto` | Tudo da empresa numa chamada (~9 KB) |
 | `obterCategoria` | `GET /hub/v1/categorias/{slug}` | Ficha de uma categoria |
-| `buscarAplicacao` | `GET /hub/v1/aplicacoes?busca=portal` | Resolve nome ou apelido; avisa quando está fora do catálogo |
+| `buscarServico` | `GET /hub/v1/servicos?busca=portal` | Resolve nome ou apelido; avisa quando está fora do catálogo |
 | `listarChamadosAbertos` | `GET /hub/v1/chamados-abertos?aplicacao=pagaflow` | Outros chamados recentes da mesma aplicação (abrangência) |
 
 ### Testar o conector de API localmente

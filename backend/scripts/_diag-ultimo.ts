@@ -10,7 +10,7 @@ console.log("SUPABASE  último login:", JSON.stringify(logins.rows));
 const doBackend = await (await fetch("http://localhost:3333/api/admin/usuarios")).json();
 console.log("BACKEND   último login:", JSON.stringify(doBackend.map((u: { id: string; ultimo_login: string | null }) => ({ id: u.id, ultimo_login: u.ultimo_login }))));
 const empresa = await pool.query("select id, agente_id from empresas");
-console.log("agente que o backend chama (empresas.agente_id):", JSON.stringify(empresa.rows), "· .env:", env.hub.agenteAurora);
+console.log("agente que o backend chama (empresas.agente_id):", JSON.stringify(empresa.rows));
 const { rows } = await pool.query(`
   select c.id, c.criado_em, c.hub_session_id as sessao_externa, t.id as turno, t.criado_em as turno_em, t.hub_sessao,
          (select string_agg(tc->>'tool' || case when (tc->>'isError')::bool then '(ERRO)' else '' end, ', ' order by ord)

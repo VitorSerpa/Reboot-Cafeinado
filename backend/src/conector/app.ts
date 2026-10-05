@@ -1,5 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 
+import { comEmpresa, comoSistema } from "../db/index.js";
 import * as catalogo from "../dominio/catalogo.js";
 import { ErroApp } from "../dominio/erros.js";
 import * as tokens from "../dominio/tokens.js";
@@ -26,10 +27,11 @@ function tokenDaRequisicao(req: Request): string | null {
 
 async function autenticar(req: Request, _res: Response, next: NextFunction) {
   try {
-    const empresa = await tokens.empresaDoToken(tokenDaRequisicao(req));
+    const empresa = await comoSistema(() => tokens.empresaDoToken(tokenDaRequisicao(req)));
     if (!empresa) return next(new ErroApp(401, "token", "Token do conector ausente, inválido ou revogado."));
     req.empresaConector = empresa;
-    next();
+    // Daqui em diante, só os dados da empresa do token (RLS).
+    comEmpresa(empresa, () => next());
   } catch (erro) {
     next(erro);
   }
@@ -67,10 +69,10 @@ rotasConector.get("/categorias/:slug", async (req, res) => {
   res.json(await catalogo.categoria(req.empresaConector!, String(req.params.slug)));
 });
 
-rotasConector.get("/aplicacoes", async (req, res) => {
+rotasConector.get("/servicos", async (req, res) => {
   const busca = String(req.query.busca ?? "").trim();
   if (!busca) throw new ErroApp(400, "busca", "Informe 'busca' com o nome ou apelido que o funcionário usou.");
-  res.json(await catalogo.buscarAplicacoes(req.empresaConector!, busca));
+  res.json(await catalogo.buscarServicos(req.empresaConector!, busca));
 });
 
 rotasConector.get("/chamados-abertos", async (req, res) => {

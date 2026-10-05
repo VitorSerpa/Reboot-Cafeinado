@@ -11,6 +11,13 @@ const BLOQUEIO_MIN = 15;
 /** Protótipo: senhas curtas são aceitas para a demonstração. Para uso real, suba para 10 ou mais. */
 export const SENHA_MIN = 5;
 
+/**
+ * A subida só cria senhas com o banco local, em desenvolvimento. No banco compartilhado (Supabase), a senha
+ * apareceria só no terminal de quem subiu, e o resto do time não saberia; lá, use npm run definir-senha.
+ */
+export const criaSenhasNaSubida = (nodeEnv: string, bancoCompartilhado: boolean) =>
+  nodeEnv === "development" && !bancoCompartilhado;
+
 /** Os dois tipos de login: o solicitante abre chamados; o suporte (perfil analista) faz a triagem e responde. */
 export const NOME_DO_PERFIL: Record<Usuario["perfil"], string> = { solicitante: "solicitante", analista: "suporte" };
 
@@ -47,9 +54,9 @@ const hashFalso = gerarHash(randomBytes(16).toString("hex"));
  * E-mail ou senha errados dão sempre a mesma mensagem, para não revelar quais e-mails existem.
  */
 export async function entrar(email: string, senha: string, perfil?: Usuario["perfil"]): Promise<Usuario> {
-  const login = await db.one<{ id: string; senha_hash: string | null; bloqueado: boolean }>(
-    `select id, senha_hash, coalesce(bloqueado_ate > now(), false) as bloqueado
-     from usuarios where lower(email) = lower($1)`,
+  const login = await db.one<{ id: string; senha_hash: string | null; bloqueado: boolean; empresa_status: string }>(
+    `select u.id, u.senha_hash, coalesce(u.bloqueado_ate > now(), false) as bloqueado, e.status as empresa_status
+     from usuarios u join empresas e on e.id = u.empresa_id where lower(u.email) = lower($1)`,
     [email.trim()],
   );
   if (!login?.senha_hash) {
@@ -71,6 +78,10 @@ export async function entrar(email: string, senha: string, perfil?: Usuario["per
     throw ERRO_CREDENCIAIS();
   }
 
+  // A senha está certa: a empresa suspensa já pode ser dita sem revelar nada a quem não tem a senha.
+  if (login.empresa_status === "suspensa") {
+    throw new ErroApp(403, "empresa_suspensa", "O acesso da sua empresa ao Chamado Pronto está suspenso. Fale com o administrador.");
+  }
   await db.query(`update usuarios set tentativas_falhas = 0, bloqueado_ate = null, ultimo_login = now() where id = $1`, [login.id]);
   const usuario = await buscarUsuario(login.id);
   if (!usuario) throw ERRO_CREDENCIAIS();
@@ -113,6 +124,25 @@ export async function definirSenha(usuarioId: string, opcoes: { email?: string; 
   );
   await encerrarSessoesDoUsuario(usuarioId);
   return { usuario: usuario.id, nome: usuario.nome, perfil: usuario.perfil, email, senha };
+}
+
+/**
+ * A mesma senha para todos os usuários (ou só os de uma empresa), escolhida por quem administra: para o ambiente de
+ * demonstração. Encerra as sessões de cada um. A senha não volta na resposta.
+ */
+export async function definirSenhaDeTodos(senha: string, empresa?: string) {
+  if (senha.length < SENHA_MIN) throw new ErroApp(400, "senha", `A senha precisa de pelo menos ${SENHA_MIN} caracteres.`);
+  const usuarios = await db.query<{ id: string }>(
+    `select id from usuarios ${empresa ? "where empresa_id = $1" : ""} order by empresa_id, perfil desc, id`,
+    empresa ? [empresa] : [],
+  );
+  if (!usuarios.length) throw new ErroApp(404, "usuarios", empresa ? `Nenhum usuário na empresa "${empresa}".` : "Nenhum usuário.");
+  const feitos = [];
+  for (const u of usuarios) {
+    const { usuario, nome, perfil, email } = await definirSenha(u.id, { senha });
+    feitos.push({ usuario, nome, perfil, email });
+  }
+  return feitos;
 }
 
 /** Cria um usuário na empresa (ou atualiza nome e perfil) e já define a senha. */

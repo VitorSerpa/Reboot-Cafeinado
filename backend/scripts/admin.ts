@@ -12,7 +12,14 @@
  *   npm run revogar-acesso-banco -- aurora        → bloqueia esse usuário
  *   npm run listar-usuarios                       → quem pode entrar (e-mail, último login, bloqueio), sem segredo
  *   npm run definir-senha -- <usuário> [e-mail] [--senha=<valor>]  → senha nova para o login (gerada, ou a escolhida)
+ *   npm run definir-senha -- <usuário> --digitar  → você digita a senha (não aparece na tela nem no histórico)
+ *   npm run definir-senha -- --todos [--empresa <empresa>]  → você digita UMA senha para todos (ou só os da empresa)
  *   npm run criar-usuario -- <id> "<Nome>" <solicitante|analista> [e-mail]  → usuário novo na Aurora, já com senha
+ *   npm run definir-agente -- aurora [uuid]       → mostra ou troca o agente da empresa (no banco: vale para todo o time)
+ *   npm run listar-empresas                       → empresas, status e o que falta em cada uma
+ *   npm run provisionar -- <empresa> [--recarregar-catalogo]  → cadastra ou completa a empresa a partir de dados/<empresa>/
+ *   npm run status-empresa -- <empresa> <suspensa|ativa>       → suspende (ninguém entra) ou reativa
+ *   npm run definir-conector -- <empresa> <slug>  → grava o slug real do conector no Hub e gera de novo o prompt
  */
 import { env } from "../src/config/env.js";
 
@@ -25,6 +32,30 @@ function mostrarLogin(l: { usuario: string; nome: string; perfil: string; email:
   console.log("Para trocar depois: npm run definir-senha -- " + l.usuario);
 }
 const base = `http://localhost:${env.port}/api/admin`;
+
+/** Lê uma linha do terminal sem mostrar o que é digitado. */
+async function lerEscondido(rotulo: string): Promise<string> {
+  const { createInterface } = await import("node:readline");
+  process.stdout.write(rotulo);
+  const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+  (rl as unknown as { _writeToOutput: (s: string) => void })._writeToOutput = () => {};
+  return new Promise((resolve) =>
+    rl.question("", (valor) => {
+      rl.close();
+      process.stdout.write("\n");
+      resolve(valor);
+    }),
+  );
+}
+
+/** Pede a senha duas vezes, sem mostrar na tela. */
+async function pedirSenha() {
+  if (!process.stdin.isTTY) throw new Error("Rode num terminal: a senha é digitada, sem aparecer na tela.");
+  const senha = await lerEscondido("Senha nova: ");
+  if (senha.length < 5) throw new Error("A senha precisa de pelo menos 5 caracteres.");
+  if ((await lerEscondido("Repita a senha: ")) !== senha) throw new Error("As duas senhas não conferem. Nada mudou.");
+  return senha;
+}
 
 async function chamar(metodo: "GET" | "POST", rota: string, corpo?: unknown) {
   const resposta = await fetch(base + rota, {
@@ -109,10 +140,28 @@ try {
       break;
     }
     case "definir-senha": {
-      if (!arg) throw new Error("Informe o usuário (veja em npm run listar-usuarios).");
-      // `--senha=<valor>` escolhe a senha; sem ele, o backend gera uma aleatória.
-      const senha = process.argv.find((a) => a.startsWith("--senha="))?.slice("--senha=".length);
+      const opcoes = process.argv.slice(3);
+      // `--todos [--empresa x]`: uma senha digitada (sem aparecer) para todos, ou para os da empresa.
+      if (opcoes.includes("--todos")) {
+        const i = opcoes.indexOf("--empresa");
+        const empresa = i >= 0 ? opcoes[i + 1] : undefined;
+        const feitos = await chamar("POST", "/usuarios/senha", { senha: await pedirSenha(), empresa });
+        console.log(`Senha definida para ${feitos.length} usuário(s)${empresa ? ` da empresa ${empresa}` : ""}. As sessões abertas deles caíram.`);
+        for (const u of feitos) console.log(`  ${u.perfil === "analista" ? "suporte    " : "solicitante"}  ${u.email}`);
+        break;
+      }
+      if (!arg || arg.startsWith("--")) {
+        throw new Error("Uso: npm run definir-senha -- <usuário> [e-mail] [--digitar | --senha=<valor>]   ou   -- --todos [--empresa <empresa>]");
+      }
       const email = descricao && !descricao.startsWith("--") ? descricao : undefined;
+      // `--digitar`: você digita a senha, sem aparecer. `--senha=<valor>`: a escolhida (fica no histórico do terminal).
+      // Sem nenhum dos dois, o backend gera uma aleatória e mostra uma vez.
+      if (opcoes.includes("--digitar")) {
+        const r = await chamar("POST", `/usuarios/${encodeURIComponent(arg)}/senha`, { email, senha: await pedirSenha() });
+        console.log(`Senha definida para ${r.nome} (${r.email}). As sessões abertas caíram.`);
+        break;
+      }
+      const senha = opcoes.find((a) => a.startsWith("--senha="))?.slice("--senha=".length);
       mostrarLogin(await chamar("POST", `/usuarios/${encodeURIComponent(arg)}/senha`, { email, senha }));
       break;
     }
@@ -122,10 +171,71 @@ try {
       mostrarLogin(await chamar("POST", "/usuarios", { id: arg, nome: descricao, perfil, email }));
       break;
     }
+    case "definir-agente": {
+      const empresa = arg ?? "aurora";
+      if (!descricao) {
+        const a = await chamar("GET", `/empresas/${encodeURIComponent(empresa)}/agente`);
+        console.log(`Agente de ${a.empresa} no banco: ${a.agente_id || "(nenhum)"}`);
+        console.log(`Para trocar: npm run definir-agente -- ${a.empresa} <uuid>`);
+        break;
+      }
+      const r = await chamar("POST", `/empresas/${encodeURIComponent(empresa)}/agente`, { agenteId: descricao });
+      console.log(`Agente de ${r.empresa}: ${r.antes || "(nenhum)"} → ${r.depois}. Status da empresa: ${r.status}.`);
+      console.log("Vale para todos os backends que usam este banco, já no próximo turno de cada chamado.");
+      break;
+    }
+    case "listar-empresas": {
+      const lista = await chamar("GET", "/empresas");
+      if (!lista.length) console.log("Nenhuma empresa. Provisione com: npm run provisionar -- <empresa>");
+      for (const e of lista) {
+        const falta = e.pendencias.length ? `falta: ${e.pendencias.join(", ")}` : "pronta";
+        console.log(
+          `${e.id.padEnd(11)} ${e.nome.padEnd(24)} ${e.status.padEnd(12)} ${falta.padEnd(44)} ${e.com_senha}/${e.usuarios} com login · ${e.chamados} chamado(s)`,
+        );
+      }
+      break;
+    }
+    case "provisionar": {
+      if (!arg) throw new Error("Uso: npm run provisionar -- <empresa> [--recarregar-catalogo]   (dossiê em dados/<empresa>/)");
+      const r = await chamar("POST", `/empresas/${encodeURIComponent(arg)}/provisionar`, {
+        recarregarCatalogo: [descricao, ...resto].includes("--recarregar-catalogo"),
+      });
+      console.log(`${r.nome} (${r.empresa}): ${r.status}${r.pendencias.length ? ` · falta: ${r.pendencias.join(", ")}` : ""}\n`);
+      for (const p of r.passos) console.log(`  ${p.ok ? "ok    " : "FALTA "} ${p.passo.padEnd(24)} ${p.detalhe}`);
+      if (r.senhas.length) {
+        console.log("\nLogins criados agora (copie: as senhas não aparecem de novo):");
+        for (const s of r.senhas) console.log(`  ${s.perfil === "analista" ? "suporte    " : "solicitante"}  ${s.email.padEnd(28)} ${s.senha}`);
+      }
+      if (r.acessoHub) {
+        console.log("\nAcesso do Hub ao banco criado agora. Copie a senha: ela não aparece de novo.");
+        console.log(`  Senha:    ${r.acessoHub.senha}`);
+      }
+      const c = r.hub.conector;
+      console.log("\nNo Hub (uma conta, uma API Key; por empresa, um conector e um agente):");
+      console.log(`  1. Conector ${c.tipo}: nome "${c.nome}" (o Hub gera o slug ${c.slug} a partir desse nome)`);
+      if (c.host) console.log(`     Host ${c.host} · Porta ${c.porta} · Banco ${c.banco} · Usuário ${c.usuario} · SSL Mode ${c.ssl}`);
+      console.log("     A senha do usuário do banco quem cola é a pessoa (npm run acesso-banco -- <empresa> gera outra).");
+      console.log(`  2. Agente "${r.hub.agente.nome}": prompt ${r.hub.agente.prompt}, só esse conector, Haiku 4.5, temperatura 0,2, Aprendizado desligado`);
+      console.log(`  3. npm run definir-agente -- ${r.empresa} <uuid do agente>`);
+      break;
+    }
+    case "definir-conector": {
+      if (!arg || !descricao) throw new Error("Uso: npm run definir-conector -- <empresa> <slug do conector no Hub>");
+      const r = await chamar("POST", `/empresas/${encodeURIComponent(arg)}/conector`, { slug: descricao });
+      console.log(`Conector de ${r.empresa}: ${r.antes || "(nenhum)"} → ${r.depois}. Ferramenta: ${r.ferramenta}.`);
+      console.log(`Prompt gerado de novo em ${r.prompt}: atualize o System Prompt do agente no Hub.`);
+      break;
+    }
+    case "status-empresa": {
+      if (!arg || (descricao !== "suspensa" && descricao !== "ativa")) throw new Error("Uso: npm run status-empresa -- <empresa> <suspensa|ativa>");
+      const r = await chamar("POST", `/empresas/${encodeURIComponent(arg)}/status`, { status: descricao });
+      console.log(`${r.empresa}: ${r.status}${r.status === "suspensa" ? " (sessões encerradas; ninguém da empresa entra)" : ""}`);
+      break;
+    }
     default:
       console.error(
         "Comandos: gerar-token, listar-tokens, revogar-token, recarregar, exportar, acesso-banco, diagnosticar-banco, revogar-acesso-banco, " +
-          "listar-usuarios, definir-senha, criar-usuario",
+          "listar-usuarios, definir-senha, criar-usuario, definir-agente, listar-empresas, provisionar, status-empresa, definir-conector",
       );
       process.exit(1);
   }

@@ -6,7 +6,7 @@ import { db } from "../db/index.js";
 import { ErroApp } from "./erros.js";
 
 /**
- * Contexto de uma empresa no Postgres: aplicações, filas, categorias e procedimentos.
+ * Contexto de uma empresa no Postgres: serviços, filas, categorias e procedimentos.
  * O banco é a fonte da verdade; os CSVs de `dados/<empresa>/` são só a carga inicial.
  */
 
@@ -26,7 +26,7 @@ export const normalizar = (s: string) =>
 /** Carrega o catálogo a partir dos CSVs. `substituir` apaga o que existe antes (recarga explícita). */
 export async function carregarDoCsv(empresa: string, { substituir }: { substituir: boolean }) {
   if (substituir) {
-    for (const tabela of ["procedimentos", "categorias", "aplicacoes", "filas"]) {
+    for (const tabela of ["procedimentos", "categorias", "servicos", "filas"]) {
       await db.query(`delete from ${tabela} where empresa_id = $1`, [empresa]);
     }
   }
@@ -38,9 +38,9 @@ export async function carregarDoCsv(empresa: string, { substituir }: { substitui
       [empresa, f.slug, f.nome, f.escopo],
     );
   }
-  for (const a of lerCsvDaEmpresa(empresa, "aplicacoes")) {
+  for (const a of lerCsvDaEmpresa(empresa, "servicos")) {
     await db.query(
-      `insert into aplicacoes (empresa_id, slug, nome, apelidos, uso, acesso, observacao) values ($1, $2, $3, $4, $5, $6, $7)
+      `insert into servicos (empresa_id, slug, nome, apelidos, uso, acesso, observacao) values ($1, $2, $3, $4, $5, $6, $7)
        on conflict (empresa_id, slug) do update set nome = excluded.nome, apelidos = excluded.apelidos,
          uso = excluded.uso, acesso = excluded.acesso, observacao = excluded.observacao`,
       [empresa, a.slug, a.nome, a.apelidos, a.uso, a.acesso, a.observacao],
@@ -102,9 +102,9 @@ export async function filas(empresa: string) {
   );
 }
 
-export async function aplicacoes(empresa: string) {
+export async function servicos(empresa: string) {
   const linhas = await db.query<{ slug: string; nome: string; uso: string; acesso: string; apelidos: string; observacao: string }>(
-    "select slug, nome, uso, acesso, apelidos, observacao from aplicacoes where empresa_id = $1 order by nome",
+    "select slug, nome, uso, acesso, apelidos, observacao from servicos where empresa_id = $1 order by nome",
     [empresa],
   );
   return linhas.map((a) => ({ ...a, apelidos: lista(a.apelidos) }));
@@ -140,8 +140,8 @@ export async function contexto(empresa: string) {
     [empresa],
   );
   if (!dados) throw new ErroApp(404, "empresa", "Empresa não encontrada.");
-  const [f, a, c, p] = await Promise.all([filas(empresa), aplicacoes(empresa), categorias(empresa), procedimentos(empresa)]);
-  return { empresa: dados, filas: f, aplicacoes: a, categorias: c, procedimentos: p };
+  const [f, s, c, p] = await Promise.all([filas(empresa), servicos(empresa), categorias(empresa), procedimentos(empresa)]);
+  return { empresa: dados, filas: f, servicos: s, categorias: c, procedimentos: p };
 }
 
 export async function categoria(empresa: string, slug: string) {
@@ -153,7 +153,7 @@ export async function categoria(empresa: string, slug: string) {
   return achada;
 }
 
-/** Pontua aplicações pelo termo buscado: nome e slug valem mais que apelido, que vale mais que uso. */
+/** Pontua serviços pelo termo buscado: nome e slug valem mais que apelido, que vale mais que uso. */
 export function pontuarAplicacao(termo: string, a: { slug: string; nome: string; apelidos: string[]; uso: string }) {
   const t = normalizar(termo);
   if (!t) return 0;
@@ -166,8 +166,8 @@ export function pontuarAplicacao(termo: string, a: { slug: string; nome: string;
   return 0;
 }
 
-export async function buscarAplicacoes(empresa: string, termo: string) {
-  const todas = await aplicacoes(empresa);
+export async function buscarServicos(empresa: string, termo: string) {
+  const todas = await servicos(empresa);
   const achadas = todas
     .map((a) => ({ ...a, relevancia: pontuarAplicacao(termo, a) }))
     .filter((a) => a.relevancia > 0)
@@ -202,7 +202,7 @@ export async function chamadosAbertos(empresa: string, aplicacao: string, horas:
 }
 
 const CSV_COLUNAS = {
-  aplicacoes: ["slug", "nome", "uso", "acesso", "apelidos", "observacao"],
+  servicos: ["slug", "nome", "uso", "acesso", "apelidos", "observacao"],
   categorias: ["slug", "nome", "fila_padrao", "discriminadores", "campos_obrigatorios", "regra_de_roteamento"],
   filas: ["slug", "nome", "escopo"],
   procedimentos: [
