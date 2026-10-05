@@ -5,28 +5,34 @@ import { Server } from "socket.io";
 import { createApp } from "./app.js";
 import { opcoesCors } from "./config/cors.js";
 import { env } from "./config/env.js";
-import { iniciarBanco } from "./db/index.js";
+import { comoSistema, iniciarBanco, PAPEL_EMPRESA } from "./db/index.js";
 import * as acessoBanco from "./dominio/acessoBanco.js";
-import * as agentes from "./dominio/agentes.js";
 import * as autenticacao from "./dominio/autenticacao.js";
+import * as empresas from "./dominio/empresas.js";
 import * as tokens from "./dominio/tokens.js";
 import { criarGatewayChamados } from "./tempo-real/gateway.js";
 
 const banco = await iniciarBanco();
-const ativos = await tokens.ativosPorEmpresa();
-const acessos = await acessoBanco.atualizarVisoes();
-const agenteAurora = (await agentes.agentesPorEmpresa()).find((e) => e.id === "aurora")?.agente_id;
-// Com o banco local, em desenvolvimento, quem ainda não tem senha ganha uma agora (mostrada só nesta subida).
-// No banco compartilhado, só avisa: a senha nova ficaria só neste terminal.
-const semSenha = (await autenticacao.listarLogins()).filter((l) => !l.email);
-const senhasNovas = autenticacao.criaSenhasNaSubida(env.nodeEnv, Boolean(env.db.url))
-  ? await Promise.all(semSenha.map((l) => autenticacao.definirSenha(l.id)))
-  : [];
+
+// A subida é da plataforma: enxerga todas as empresas.
+const subida = await comoSistema(async () => {
+  const ativos = await tokens.ativosPorEmpresa();
+  await acessoBanco.atualizarVisoes();
+  // Com o banco local, em desenvolvimento, quem ainda não tem senha ganha uma agora (mostrada só nesta subida).
+  // No banco compartilhado, só avisa: a senha nova ficaria só neste terminal.
+  const semSenha = (await autenticacao.listarLogins()).filter((l) => !l.email);
+  const senhasNovas = autenticacao.criaSenhasNaSubida(env.nodeEnv, Boolean(env.db.url))
+    ? await Promise.all(semSenha.map((l) => autenticacao.definirSenha(l.id)))
+    : [];
+  for (const e of await empresas.listar()) await empresas.atualizarStatus(e.id);
+  return { ativos, semSenha, senhasNovas, lista: await empresas.listar() };
+});
+
 // Mostra já, antes de abrir a porta: se a subida falhar depois (porta ocupada), as senhas não se perdem.
-if (senhasNovas.length) {
+if (subida.senhasNovas.length) {
   console.log("[backend] senhas criadas agora para quem não tinha (copie: não aparecem de novo):");
-  for (const s of senhasNovas) {
-    console.log(`           ${s.perfil === "analista" ? "suporte    " : "solicitante"}  ${s.email.padEnd(24)} ${s.senha}`);
+  for (const s of subida.senhasNovas) {
+    console.log(`           ${s.perfil === "analista" ? "suporte    " : "solicitante"}  ${s.email.padEnd(28)} ${s.senha}`);
   }
   console.log("           para trocar depois: npm run definir-senha -- <usuário>");
 }
@@ -42,33 +48,35 @@ criarGatewayChamados(io);
 
 httpServer.listen(env.port, () => {
   console.log(`[backend] http://localhost:${env.port}/api (${env.nodeEnv})  ·  banco: ${banco}`);
+  console.log(`[backend] isolamento por empresa: RLS no banco (as consultas das empresas rodam como ${PAPEL_EMPRESA})`);
   console.log(`[backend] socket em ws://localhost:${env.port}/socket.io  ·  namespace /chamados (chamado e triagem)`);
   console.log(
-    `[backend] Hub: ${env.hub.modo}${env.hub.modo === "real" ? ` (${env.hub.baseUrl})` : " — respostas fixas, sem chave"}`,
+    `[backend] Hub: ${env.hub.modo}${env.hub.modo === "real" ? ` (${env.hub.baseUrl}, uma API Key da plataforma)` : " — respostas fixas, sem chave"}`,
   );
-  // O agente vem do banco e vale para todos que usam o mesmo banco; o .env só o preenche na primeira carga.
-  console.log(`[backend] agente da aurora (no banco): ${agenteAurora ?? "—"}`);
-  if (agenteAurora && agenteAurora !== env.hub.agenteAurora) {
+
+  if (!subida.lista.length) {
+    const dossies = empresas.empresasComDossie();
     console.log(
-      `[backend] o .env pede o agente ${env.hub.agenteAurora}, mas quem manda é o banco. ` +
-        `Para trocar para todos: npm run definir-agente -- aurora ${env.hub.agenteAurora}`,
+      `[backend] nenhuma empresa no banco. Provisione com npm run provisionar -- <empresa>` +
+        (dossies.length ? ` (dossiês em dados/: ${dossies.join(", ")})` : ""),
     );
+  } else {
+    console.log("[backend] empresas:");
+    for (const e of subida.lista) {
+      const situacao = e.pendencias.length ? `falta: ${e.pendencias.join(", ")}` : `agente ${e.agente_id.slice(0, 8)}…`;
+      console.log(
+        `           ${e.id.padEnd(11)} ${e.nome.padEnd(24)} ${e.status.padEnd(12)} ${situacao}  ·  ${e.com_senha}/${e.usuarios} com login · ${e.chamados} chamado(s)`,
+      );
+    }
   }
+
   console.log(
     `[backend] conector de API em /hub/v1 (OpenAPI em /hub/v1/openapi.json) · ` +
-      (ativos.length ? `tokens ativos: ${ativos.map((a) => `${a.empresa_id} (${a.total})`).join(", ")}` : "nenhum token ativo"),
+      (subida.ativos.length ? `tokens ativos: ${subida.ativos.map((a) => `${a.empresa_id} (${a.total})`).join(", ")}` : "nenhum token ativo"),
   );
-  console.log(
-    `[backend] acesso do Hub ao banco (conector PostgreSQL): ` +
-      (!env.db.url
-        ? "indisponível com o PGlite local (o Hub não alcança esta máquina)"
-        : acessos.length
-          ? acessos.map((a) => `hub_${a.id}${a.login ? "" : " (revogado)"}`).join(", ")
-          : "nenhum; crie com npm run acesso-banco -- aurora"),
-  );
-  if (!senhasNovas.length && semSenha.length) {
+  if (!subida.senhasNovas.length && subida.semSenha.length) {
     console.log(
-      `[backend] sem senha (não conseguem entrar): ${semSenha.map((l) => l.id).join(", ")} · npm run definir-senha -- <usuário>` +
+      `[backend] sem senha (não conseguem entrar): ${subida.semSenha.map((l) => l.id).join(", ")} · npm run definir-senha -- <usuário>` +
         (env.db.url ? " (banco compartilhado: a subida não cria senhas)" : ""),
     );
   }

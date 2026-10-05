@@ -66,6 +66,10 @@ separa as rotas do solicitante (`/chamados`, exceto o detalhe, que confere o don
 O domínio repete a checagem, porque o WebSocket não passa pelas rotas. `POST /api/auth/sair` encerra a sessão e
 derruba o socket dela; `definir-senha` encerra todas as sessões do usuário.
 
+Isolamento por empresa: toda consulta roda com um contexto (`comEmpresa` ou `comoSistema`, em `src/db/index.ts`). O
+`exigirLogin`, o conector `/hub/v1` e cada evento do socket entram com a empresa do usuário ou do token, e aí o banco
+filtra pelo RLS (papel `app_runtime`). O agente de cada empresa fica na tabela `empresas` (veja o README da raiz).
+
 ## Variáveis de ambiente
 
 | Var | Default | Descrição |
@@ -80,5 +84,4 @@ derruba o socket dela; `definir-senha` encerra todas as sessões do usuário.
 | `HUB_MODE` | `real` com chave, senão `simulado` | `simulado` usa respostas fixas, sem custo |
 | `HUB_BASE_URL` | `https://belatrix.ai` | Endereço do Kaffa AI Hub |
 | `HUB_API_KEY` | vazio | Chave do Hub; com ela, o modo vira `real` |
-| `HUB_AGENTE_AURORA` | `06abc3a3-…` | Agente da Aurora **só na primeira carga do banco**. Depois quem manda é o banco: `npm run definir-agente -- aurora <uuid>` |
 | `HUB_TIMEOUT_MS` | `90000` | Tempo máximo de um turno do agente |

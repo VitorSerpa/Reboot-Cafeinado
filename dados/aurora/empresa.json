@@ -1,0 +1,14 @@
+{
+  "nome": "Aurora Distribuição",
+  "mercado": "Distribuição atacadista",
+  "area": "Financeiro",
+  "descricao": "Distribuidora atacadista de materiais de escritório e limpeza, com matriz e duas filiais. O Financeiro processa pagamentos a fornecedores, acompanha recebimentos, aprova despesas e faz o fechamento contábil.",
+  "dominio_email": "aurora.test",
+  "agente_id": "06abc3a3-1c9f-785e-8000-519434bce89a",
+  "conector_slug": "postgres-aurora",
+  "usuarios": [
+    { "id": "ana", "nome": "Ana Ribeiro", "perfil": "solicitante" },
+    { "id": "carlos", "nome": "Carlos Menezes", "perfil": "solicitante" },
+    { "id": "bruna", "nome": "Bruna Tavares", "perfil": "analista" }
+  ]
+}

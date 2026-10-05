@@ -1,0 +1,6 @@
+slug,nome,uso,acesso,apelidos,observacao
+agendavita,AgendaVita,Agendamento de consultas e confirmação com o paciente,Web,"agenda, agendamento, sistema de agenda","Horários somem quando o médico está de férias ou a coordenação bloqueia a agenda. Isso é configuração, não defeito."
+faturaplus,FaturaPlus,Faturamento de convênios e envio de guias,Web,"faturamento, guias, convênio, lote","Guia glosada pelo convênio é regra do convênio, não falha do sistema. O lote do mês fica fechado do dia 25 ao 27 para conferência."
+recepcaovita,RecepçãoVita,Check-in do paciente e elegibilidade do convênio,Desktop no balcão,"recepção, check-in, balcão","Elegibilidade negada vem do convênio (carteirinha vencida, carência). Depende da rede local da clínica."
+suprimentos-vitalis,Suprimentos Vitalis,Pedidos e estoque de insumos,Web,"estoque, pedido de material, almoxarifado",Pedido acima de R$ 5 mil precisa de aprovação da coordenação. Pendência de aprovação não é erro.
+painel-vitalis,Painel Vitalis,Indicadores de atendimento e ocupação da agenda,Web,"painel, indicadores, dashboard, bi","Só leitura. Atualiza uma vez por dia, às 6h: número do dia anterior é esperado."

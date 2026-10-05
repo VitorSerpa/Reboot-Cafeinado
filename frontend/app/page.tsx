@@ -61,7 +61,7 @@ export default function Entrada() {
         <div className="pilha">
           <h1>Entrar</h1>
           <p className="suave">
-            Chamado Pronto · <strong>Aurora Distribuição</strong>
+            Chamado Pronto · entre com o e-mail da sua empresa
           </p>
 
           <form className="cartao pilha" onSubmit={entrar}>

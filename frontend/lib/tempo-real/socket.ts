@@ -98,7 +98,7 @@ export function textoDaFase(fase: FaseAgente | null): string {
   switch (fase?.fase) {
     case "consultando":
       return /(catalogo|contexto|query|run_query|read_file|obter)/i.test(fase.ferramenta)
-        ? "O assistente está consultando o catálogo da Aurora…"
+        ? "O assistente está consultando o catálogo da empresa…"
         : "O assistente está usando uma ferramenta…";
     case "escrevendo":
       return "O assistente está escrevendo…";

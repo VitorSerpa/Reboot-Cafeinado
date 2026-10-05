@@ -14,13 +14,15 @@ export interface Usuario {
   empresa_id: string;
   nome: string;
   perfil: "solicitante" | "analista";
+  /** Nome da empresa, para o cabeçalho do app. */
+  empresa_nome?: string;
 }
 
 /** Colunas públicas do usuário: nunca `select *`, que traria o hash da senha para a API e o WebSocket. */
-const COLUNAS = "id, empresa_id, nome, perfil";
+const COLUNAS = "u.id, u.empresa_id, u.nome, u.perfil, e.nome as empresa_nome";
 
 export async function buscarUsuario(id: string) {
-  return db.one<Usuario>(`select ${COLUNAS} from usuarios where id = $1`, [id]);
+  return db.one<Usuario>(`select ${COLUNAS} from usuarios u join empresas e on e.id = u.empresa_id where u.id = $1`, [id]);
 }
 
 /** O banco guarda só o hash: quem lê a tabela `sessoes` não consegue entrar como ninguém. */
@@ -40,13 +42,13 @@ export async function abrirSessao(usuarioId: string) {
   return token;
 }
 
-/** Usuário de uma sessão aberta e dentro do prazo; `undefined` para token desconhecido, vencido ou encerrado. */
+/** Usuário de uma sessão aberta e dentro do prazo; `undefined` para token desconhecido, vencido, encerrado ou de empresa suspensa. */
 export async function usuarioDaSessao(token: unknown): Promise<Usuario | undefined> {
   if (typeof token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(token)) return undefined;
   return db.one<Usuario>(
-    `select u.id, u.empresa_id, u.nome, u.perfil
-     from sessoes s join usuarios u on u.id = s.usuario_id
-     where s.hash = $1 and s.encerrada_em is null and s.expira_em > now()`,
+    `select ${COLUNAS}
+     from sessoes s join usuarios u on u.id = s.usuario_id join empresas e on e.id = u.empresa_id
+     where s.hash = $1 and s.encerrada_em is null and s.expira_em > now() and e.status <> 'suspensa'`,
     [hashDaSessao(token)],
   );
 }

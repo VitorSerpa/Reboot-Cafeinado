@@ -1,0 +1,5 @@
+slug,nome,escopo
+sistemas-academicos,Sistemas Acadêmicos,"Erro, travamento e falha funcional dos sistemas do instituto."
+acessos-contas,Acessos e Contas,"Senha, conta bloqueada, MFA e permissão de uso dentro dos sistemas."
+infraestrutura-campus,Infraestrutura dos Campi,"Rede, Wi-Fi, laboratórios, projetores e indisponibilidade geral."
+secretaria-financeiro,Secretaria e Financeiro,"Regra acadêmica, prazo do calendário, boletos, acordos, bolsas e requerimentos."

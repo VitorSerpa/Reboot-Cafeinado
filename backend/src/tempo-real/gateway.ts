@@ -1,5 +1,6 @@
 import type { Namespace, Server, Socket } from "socket.io";
 
+import { comEmpresa, comoSistema } from "../db/index.js";
 import * as chamados from "../dominio/chamados.js";
 import { ErroApp } from "../dominio/erros.js";
 import { eventos } from "../dominio/eventos.js";
@@ -29,8 +30,12 @@ async function estado(chamadoId: number, usuario: DadosSocket["usuario"]): Promi
   return { chamado, turnos: await chamados.turnos(chamado.id) };
 }
 
-/** Roda a ação e devolve no ack o resultado ou o erro no formato da API REST. */
-async function responderCom<T>(ack: Ack<T> | undefined, acao: () => Promise<T>) {
+/** Roda a ação com os dados da empresa do usuário (RLS) e devolve no ack o resultado ou o erro no formato da API REST. */
+function responderCom<T>(usuario: DadosSocket["usuario"], ack: Ack<T> | undefined, acao: () => Promise<T>) {
+  return comEmpresa(usuario.empresa_id, () => devolverNoAck(ack, acao));
+}
+
+async function devolverNoAck<T>(ack: Ack<T> | undefined, acao: () => Promise<T>) {
   try {
     const data = await acao();
     ack?.({ ok: true, data });
@@ -57,7 +62,8 @@ export function criarGatewayChamados(io: Server) {
       // O token da aba vem antes do cookie: o cookie é um só por navegador, e a reconexão da triagem chegaria
       // como o solicitante que entrou em outra aba (sem a sala da fila, a tela parava de atualizar).
       const token = socket.handshake.auth?.token || tokenDoCookie(socket.handshake.headers.cookie);
-      const usuario = await usuarioDaSessao(token);
+      // Antes de saber quem é, não há empresa: a sessão é da plataforma.
+      const usuario = await comoSistema(() => usuarioDaSessao(token));
       if (!usuario) return next(new Error("sem_sessao"));
       socket.data.usuario = usuario;
       socket.data.sessao = hashDaSessao(token);
@@ -73,14 +79,14 @@ export function criarGatewayChamados(io: Server) {
     if (usuario.perfil === "analista") socket.join(salaTriagem(usuario.empresa_id));
 
     socket.on("chamado:abrir", (payload, ack) =>
-      responderCom(ack, async () => {
+      responderCom(usuario, ack, async () => {
         const chamado = await chamados.abrirChamado(usuario, String(payload?.texto ?? ""));
         return estado(chamado.id, usuario);
       }),
     );
 
     socket.on("chamado:responder", (payload, ack) =>
-      responderCom(ack, async () => {
+      responderCom(usuario, ack, async () => {
         const id = Number(payload?.chamadoId);
         if (!Number.isInteger(id) || id <= 0) throw new ErroApp(400, "id", "Identificador inválido.");
         const chamado = await chamados.responder(usuario, id, String(payload?.texto ?? ""));
@@ -89,7 +95,7 @@ export function criarGatewayChamados(io: Server) {
     );
 
     socket.on("chamado:mensagem", (payload, ack) =>
-      responderCom(ack, async () => {
+      responderCom(usuario, ack, async () => {
         const id = Number(payload?.chamadoId);
         if (!Number.isInteger(id) || id <= 0) throw new ErroApp(400, "id", "Identificador inválido.");
         const chamado = await chamados.enviarMensagem(usuario, id, String(payload?.texto ?? ""));
@@ -107,22 +113,25 @@ export function criarGatewayChamados(io: Server) {
     nsp.to(salaUsuario(solicitanteId)).emit("chamado:agente", progresso);
   });
 
-  eventos.on("chamado", async ({ chamadoId, empresaId, solicitanteId }) => {
-    try {
-      const chamado = await chamados.carregarComAcesso(
-        { id: solicitanteId, empresa_id: empresaId, nome: "", perfil: "solicitante" },
-        chamadoId,
-      );
-      nsp.to(salaUsuario(solicitanteId)).emit("chamado:atualizado", { chamado, turnos: await chamados.turnos(chamadoId) });
+  // O aviso roda com a empresa do chamado: o que vai para a sala da triagem só pode ser dela.
+  eventos.on("chamado", ({ chamadoId, empresaId, solicitanteId }) =>
+    comEmpresa(empresaId, async () => {
+      try {
+        const chamado = await chamados.carregarComAcesso(
+          { id: solicitanteId, empresa_id: empresaId, nome: "", perfil: "solicitante" },
+          chamadoId,
+        );
+        nsp.to(salaUsuario(solicitanteId)).emit("chamado:atualizado", { chamado, turnos: await chamados.turnos(chamadoId) });
 
-      if (chamado.status === "aguardando_triagem" || chamado.status === "triado") {
-        nsp.to(salaTriagem(empresaId)).emit("triagem:fila", await triagem.filaDaEmpresa(empresaId));
-        nsp.to(salaTriagem(empresaId)).emit("triagem:chamado", { chamadoId });
+        if (chamado.status === "aguardando_triagem" || chamado.status === "triado") {
+          nsp.to(salaTriagem(empresaId)).emit("triagem:fila", await triagem.filaDaEmpresa(empresaId));
+          nsp.to(salaTriagem(empresaId)).emit("triagem:chamado", { chamadoId });
+        }
+      } catch (erro) {
+        console.error(`[tempo-real] falha ao avisar a mudança do chamado #${chamadoId}:`, erro);
       }
-    } catch (erro) {
-      console.error(`[tempo-real] falha ao avisar a mudança do chamado #${chamadoId}:`, erro);
-    }
-  });
+    }),
+  );
 
   return nsp;
 }

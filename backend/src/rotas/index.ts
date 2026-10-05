@@ -3,11 +3,13 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import { join } from "node:path";
 
 import { env } from "../config/env.js";
+import { comEmpresa, comoSistema } from "../db/index.js";
 import { DADOS_DIR } from "../dados/csv.js";
 import * as catalogo from "../dominio/catalogo.js";
 import * as chamados from "../dominio/chamados.js";
 import * as acessoBanco from "../dominio/acessoBanco.js";
 import * as agentes from "../dominio/agentes.js";
+import * as empresas from "../dominio/empresas.js";
 import * as tokens from "../dominio/tokens.js";
 import { ErroApp } from "../dominio/erros.js";
 import * as triagem from "../dominio/triagem.js";
@@ -37,15 +39,16 @@ const tokenDe = (req: Request) => {
 
 /**
  * Só passa com uma sessão aberta no banco (login feito, dentro das 8 horas, sem ter saído).
- * A empresa e o perfil saem sempre daqui, nunca do navegador.
+ * A empresa e o perfil saem sempre daqui, nunca do navegador. O resto da requisição roda com a empresa do usuário:
+ * as consultas passam pelo RLS e só enxergam essa empresa.
  */
 async function exigirLogin(req: Request, _res: Response, next: NextFunction) {
   const token = tokenDe(req);
-  const usuario = await usuarioDaSessao(token);
+  const usuario = await comoSistema(() => usuarioDaSessao(token));
   if (!usuario) return next(new ErroApp(401, "sem_sessao", "Sua sessão terminou. Entre com seu e-mail e senha."));
   req.usuario = usuario;
   req.sessao = token;
-  next();
+  comEmpresa(usuario.empresa_id, () => next());
 }
 
 /** Depois de `exigirLogin`: só o tipo de login certo (o suporte é o perfil `analista`). */
@@ -83,8 +86,11 @@ rotas.post("/auth/entrar", async (req, res) => {
   if (perfil !== undefined && perfil !== "solicitante" && perfil !== "analista") {
     throw new ErroApp(400, "perfil", "Tipo de login inválido.");
   }
-  const usuario = await autenticacao.entrar(email, senha, perfil);
-  const token = await abrirSessao(usuario.id);
+  // Antes do login não há empresa: e-mail, senha e sessão são da plataforma.
+  const { usuario, token } = await comoSistema(async () => {
+    const usuario = await autenticacao.entrar(email, senha, perfil);
+    return { usuario, token: await abrirSessao(usuario.id) };
+  });
   res.cookie(COOKIE, token, { ...OPCOES_COOKIE, maxAge: DURACAO_SESSAO_MS });
   res.json({ ...usuario, token });
 });
@@ -92,7 +98,7 @@ rotas.post("/auth/entrar", async (req, res) => {
 // Encerra a sessão desta aba no banco: o token deixa de valer mesmo que alguém o tenha guardado.
 rotas.post("/auth/sair", async (req, res) => {
   const token = tokenDe(req);
-  if (typeof token === "string" && token) await encerrarSessao(token);
+  if (typeof token === "string" && token) await comoSistema(() => encerrarSessao(token));
   // O cookie só sai se for desta mesma sessão: o de outra aba (outro usuário) continua.
   if (!req.cookies?.[COOKIE] || req.cookies[COOKIE] === token) res.clearCookie(COOKIE, OPCOES_COOKIE);
   res.json({ ok: true });
@@ -115,7 +121,8 @@ function soLocal(req: Request, _res: Response, next: NextFunction) {
   const origem = req.socket.remoteAddress ?? "";
   // O rewrite do Next (/api) também chega de 127.0.0.1, mas marca o pedido com x-forwarded-*: esse veio de fora.
   const repassado = Boolean(req.headers["x-forwarded-for"] || req.headers["x-forwarded-host"]);
-  if (!repassado && ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(origem)) return next();
+  // A administração é da plataforma: enxerga todas as empresas (dono das tabelas, sem RLS).
+  if (!repassado && ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(origem)) return comoSistema(() => next());
   next(new ErroApp(403, "local", "Administração só pela própria máquina."));
 }
 
@@ -156,11 +163,26 @@ rotas.get("/admin/empresas/:empresa/agente", soLocal, async (req, res) => {
   const empresa = String(req.params.empresa);
   const achada = (await agentes.agentesPorEmpresa()).find((e) => e.id === empresa);
   if (!achada) throw new ErroApp(404, "empresa", `Empresa "${empresa}" não existe.`);
-  res.json({ empresa, agente_id: achada.agente_id, env: env.hub.agenteAurora });
+  res.json({ empresa, agente_id: achada.agente_id });
 });
 
 rotas.post("/admin/empresas/:empresa/agente", soLocal, async (req, res) => {
   res.json(await agentes.definirAgente(String(req.params.empresa), String(req.body?.agenteId ?? "")));
+});
+
+// Empresas: cadastro, provisionamento a partir do dossiê (dados/<empresa>/) e status.
+rotas.get("/admin/empresas", soLocal, async (_req, res) => {
+  res.json(await empresas.listar());
+});
+
+rotas.post("/admin/empresas/:empresa/provisionar", soLocal, async (req, res) => {
+  res.json(await empresas.provisionar(String(req.params.empresa), { recarregarCatalogo: Boolean(req.body?.recarregarCatalogo) }));
+});
+
+rotas.post("/admin/empresas/:empresa/status", soLocal, async (req, res) => {
+  const status = String(req.body?.status ?? "");
+  if (status !== "suspensa" && status !== "ativa") throw new ErroApp(400, "status", 'Status: "suspensa" ou "ativa".');
+  res.json(await empresas.definirStatus(String(req.params.empresa), status));
 });
 
 rotas.post("/admin/empresas/:empresa/tokens-conector", soLocal, async (req, res) => {

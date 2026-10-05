@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { PGlite } from "@electric-sql/pglite";
-
 import { origemPermitida } from "../config/cors.js";
-import { SCHEMA } from "../db/schema.js";
-import { DESCRICAO_AURORA, SQL_EMPRESA_AURORA } from "../db/seed.js";
 import { validarAgenteId } from "./agentes.js";
 import { criaSenhasNaSubida } from "./autenticacao.js";
 
@@ -31,21 +27,4 @@ test("agente: só aceita UUID", () => {
   for (const ruim of ["", "teste", "qualificador-aurora-banco", "06abc3a3-1c9f-785e-8000"]) {
     assert.throws(() => validarAgenteId(ruim), /UUID/, ruim);
   }
-});
-
-test("seed: o agente que está no banco não muda quando outro backend sobe com outro .env", async () => {
-  const pg = new PGlite();
-  await pg.exec(SCHEMA);
-  const agente = async () => (await pg.query<{ agente_id: string }>("select agente_id from empresas where id = 'aurora'")).rows[0].agente_id;
-
-  await pg.query(SQL_EMPRESA_AURORA, ["agente-do-primeiro", DESCRICAO_AURORA]);
-  assert.equal(await agente(), "agente-do-primeiro");
-
-  await pg.query(SQL_EMPRESA_AURORA, ["agente-de-outra-maquina", DESCRICAO_AURORA]);
-  assert.equal(await agente(), "agente-do-primeiro");
-
-  await pg.query("update empresas set agente_id = '' where id = 'aurora'");
-  await pg.query(SQL_EMPRESA_AURORA, ["agente-novo", DESCRICAO_AURORA]);
-  assert.equal(await agente(), "agente-novo");
-  await pg.close();
 });

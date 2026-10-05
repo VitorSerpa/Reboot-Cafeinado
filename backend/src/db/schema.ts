@@ -159,6 +159,15 @@ create table if not exists triagens (
   motivo        text,
   criado_em     timestamptz not null default now()
 );
+
+-- Cadastro de empresas: é o registro oficial de quem usa o app (o dossiê em dados/<empresa>/ é só a entrada do
+-- provisionamento). 'implantacao' enquanto falta algo (agente, acesso do Hub); 'suspensa' não entra no app.
+alter table empresas add column if not exists status        text not null default 'ativa';
+alter table empresas add column if not exists dominio_email text not null default '';
+alter table empresas add column if not exists conector_slug text not null default '';
+alter table empresas add column if not exists criada_em     timestamptz not null default now();
+alter table empresas drop constraint if exists empresas_status_check;
+alter table empresas add constraint empresas_status_check check (status in ('implantacao', 'ativa', 'suspensa'));
 `;
 
 /**
@@ -183,4 +192,43 @@ begin
     revoke all on all sequences in schema public from anon, authenticated;
   end if;
 end $$;
+`;
+
+/** Tabelas com `empresa_id`: a política compara com a empresa do contexto. Turnos e triagens vão pelo chamado. */
+const COM_EMPRESA = ["usuarios", "filas", "aplicacoes", "categorias", "procedimentos", "chamados", "tokens_conector"] as const;
+const PELO_CHAMADO = ["turnos", "triagens"] as const;
+
+const politica = (tabela: string, condicao: string) => `
+drop policy if exists isolamento_empresa on public.${tabela};
+create policy isolamento_empresa on public.${tabela} to app_runtime using (${condicao}) with check (${condicao});`;
+
+/**
+ * Isolamento por empresa garantido pelo banco (RLS). O backend atende cada requisição no papel `app_runtime`, com
+ * `app.empresa_id` definido (db/index.ts): um `where empresa_id` esquecido não vaza nada, porque o banco só devolve
+ * linhas da empresa do contexto. Sem empresa no contexto, `current_setting` volta nulo e nada aparece.
+ * O papel tem o mínimo: lê o contexto e grava chamados, turnos e triagens; não vê senha, sessão nem token.
+ * O dono das tabelas (migrações, cadastro, login, administração) não passa pelo RLS: ele não é forçado.
+ */
+export const ISOLAMENTO = /* sql */ `
+do $$
+begin
+  if not exists (select 1 from pg_roles where rolname = 'app_runtime') then
+    create role app_runtime nologin noinherit;
+  end if;
+  -- Quem roda as migrações (o dono das tabelas) precisa poder assumir o papel: SET ROLE app_runtime.
+  if not pg_has_role(current_user, 'app_runtime', 'member') then
+    execute format('grant app_runtime to %I', current_user);
+  end if;
+end $$;
+
+grant usage on schema public to app_runtime;
+revoke all on ${TABELAS.map((t) => `public.${t}`).join(", ")} from app_runtime;
+grant select on public.empresas, public.filas, public.aplicacoes, public.categorias, public.procedimentos to app_runtime;
+grant select (id, empresa_id, nome, perfil) on public.usuarios to app_runtime;
+grant select, insert, update on public.chamados to app_runtime;
+grant select, insert on public.turnos, public.triagens to app_runtime;
+grant usage, select on sequence public.chamados_id_seq, public.turnos_id_seq to app_runtime;
+${politica("empresas", "id = current_setting('app.empresa_id', true)")}
+${COM_EMPRESA.map((t) => politica(t, "empresa_id = current_setting('app.empresa_id', true)")).join("\n")}
+${PELO_CHAMADO.map((t) => politica(t, `exists (select 1 from public.chamados c where c.id = ${t}.chamado_id)`)).join("\n")}
 `;

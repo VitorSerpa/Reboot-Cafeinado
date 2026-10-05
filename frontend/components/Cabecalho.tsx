@@ -104,7 +104,7 @@ export function Cabecalho({
           <span className="usuario">
             {usuario.nome}
             <br />
-            {usuario.perfil === "analista" ? "Suporte" : "Solicitante"} · Aurora Distribuição
+            {usuario.perfil === "analista" ? "Suporte" : "Solicitante"} · {usuario.empresa_nome ?? usuario.empresa_id}
           </span>
           <button onClick={sair}>Sair</button>
         </>

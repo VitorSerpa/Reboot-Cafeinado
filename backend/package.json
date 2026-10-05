@@ -23,7 +23,10 @@
     "listar-usuarios": "tsx scripts/admin.ts listar-usuarios",
     "definir-senha": "tsx scripts/admin.ts definir-senha",
     "criar-usuario": "tsx scripts/admin.ts criar-usuario",
-    "definir-agente": "tsx scripts/admin.ts definir-agente"
+    "definir-agente": "tsx scripts/admin.ts definir-agente",
+    "listar-empresas": "tsx scripts/admin.ts listar-empresas",
+    "provisionar": "tsx scripts/admin.ts provisionar",
+    "status-empresa": "tsx scripts/admin.ts status-empresa"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

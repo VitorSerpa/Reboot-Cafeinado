@@ -1,5 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 
+import { comEmpresa, comoSistema } from "../db/index.js";
 import * as catalogo from "../dominio/catalogo.js";
 import { ErroApp } from "../dominio/erros.js";
 import * as tokens from "../dominio/tokens.js";
@@ -26,10 +27,11 @@ function tokenDaRequisicao(req: Request): string | null {
 
 async function autenticar(req: Request, _res: Response, next: NextFunction) {
   try {
-    const empresa = await tokens.empresaDoToken(tokenDaRequisicao(req));
+    const empresa = await comoSistema(() => tokens.empresaDoToken(tokenDaRequisicao(req)));
     if (!empresa) return next(new ErroApp(401, "token", "Token do conector ausente, inválido ou revogado."));
     req.empresaConector = empresa;
-    next();
+    // Daqui em diante, só os dados da empresa do token (RLS).
+    comEmpresa(empresa, () => next());
   } catch (erro) {
     next(erro);
   }

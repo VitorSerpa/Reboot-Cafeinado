@@ -54,9 +54,9 @@ const hashFalso = gerarHash(randomBytes(16).toString("hex"));
  * E-mail ou senha errados dão sempre a mesma mensagem, para não revelar quais e-mails existem.
  */
 export async function entrar(email: string, senha: string, perfil?: Usuario["perfil"]): Promise<Usuario> {
-  const login = await db.one<{ id: string; senha_hash: string | null; bloqueado: boolean }>(
-    `select id, senha_hash, coalesce(bloqueado_ate > now(), false) as bloqueado
-     from usuarios where lower(email) = lower($1)`,
+  const login = await db.one<{ id: string; senha_hash: string | null; bloqueado: boolean; empresa_status: string }>(
+    `select u.id, u.senha_hash, coalesce(u.bloqueado_ate > now(), false) as bloqueado, e.status as empresa_status
+     from usuarios u join empresas e on e.id = u.empresa_id where lower(u.email) = lower($1)`,
     [email.trim()],
   );
   if (!login?.senha_hash) {
@@ -78,6 +78,10 @@ export async function entrar(email: string, senha: string, perfil?: Usuario["per
     throw ERRO_CREDENCIAIS();
   }
 
+  // A senha está certa: a empresa suspensa já pode ser dita sem revelar nada a quem não tem a senha.
+  if (login.empresa_status === "suspensa") {
+    throw new ErroApp(403, "empresa_suspensa", "O acesso da sua empresa ao Chamado Pronto está suspenso. Fale com o administrador.");
+  }
   await db.query(`update usuarios set tentativas_falhas = 0, bloqueado_ate = null, ultimo_login = now() where id = $1`, [login.id]);
   const usuario = await buscarUsuario(login.id);
   if (!usuario) throw ERRO_CREDENCIAIS();

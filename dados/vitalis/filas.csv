@@ -1,0 +1,5 @@
+slug,nome,escopo
+sistemas-clinicas,Sistemas das Clínicas,"Erro, travamento e falha funcional das aplicações administrativas."
+acessos,Acessos e Contas,"Senha, bloqueio de conta, MFA e permissão de uso dentro de uma aplicação."
+rede-equipamentos,Rede e Equipamentos,"Internet da clínica, Wi-Fi, impressora, totem de senha e computador do balcão."
+processos-administrativos,Processos Administrativos,"Regra de convênio, glosa, elegibilidade, aprovação de pedido e fechamento do lote de faturamento."

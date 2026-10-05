@@ -1,4 +1,5 @@
 import { db } from "../db/index.js";
+import { atualizarStatus } from "./empresas.js";
 import { ErroApp } from "./erros.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -22,5 +23,5 @@ export async function definirAgente(empresa: string, agenteId: string) {
   const atual = await db.one<{ agente_id: string }>("select agente_id from empresas where id = $1", [empresa]);
   if (!atual) throw new ErroApp(404, "empresa", `Empresa "${empresa}" não existe.`);
   await db.query("update empresas set agente_id = $2 where id = $1", [empresa, novo]);
-  return { empresa, antes: atual.agente_id, depois: novo };
+  return { empresa, antes: atual.agente_id, depois: novo, status: await atualizarStatus(empresa) };
 }
