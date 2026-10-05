@@ -4,8 +4,8 @@
   "area": "Administrativo",
   "descricao": "Rede de seis clínicas de especialidades em duas cidades. O administrativo cuida do agendamento de consultas, da recepção e do check-in dos pacientes, do faturamento de convênios e do estoque de insumos.",
   "dominio_email": "vitalis.test",
-  "agente_id": "",
-  "conector_slug": "postgres-vitalis",
+  "agente_id": "06ac3d51-8f43-74f3-8000-9f58eba61756",
+  "conector_slug": "postgres-rede-vitalis",
   "usuarios": [
     { "id": "paula", "nome": "Paula Souza", "perfil": "solicitante" },
     { "id": "diego", "nome": "Diego Lima", "perfil": "solicitante" },

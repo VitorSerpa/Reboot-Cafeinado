@@ -117,6 +117,7 @@ Depois de criar o agente no Hub, rode `npm run definir-agente -- vitalis <uuid>`
 | `npm run definir-agente -- <empresa> [uuid]` | Mostra ou troca o agente. Vale para todos que usam o banco, já no próximo turno |
 | `npm run status-empresa -- <empresa> suspensa` | Ninguém da empresa entra, as sessões caem na hora e o acesso do Hub é bloqueado |
 | `npm run status-empresa -- <empresa> ativa` | Reativa |
+| `npm run definir-conector -- <empresa> <slug>` | Grava o slug real do conector no Hub e gera de novo o prompt. O Hub deriva o slug do nome do conector e não deixa mudar depois: "Postgres Horizonte" vira `postgres-horizonte` |
 
 ## Contexto no banco
 

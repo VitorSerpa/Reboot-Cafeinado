@@ -264,13 +264,37 @@ export async function provisionar(empresa: string, opcoes: { recarregarCatalogo?
       conector: {
         tipo: "Database (PostgreSQL)",
         slug: e.conector_slug,
-        nome: `Postgres ${e.nome}`,
+        // O Hub gera o slug a partir do nome (e não deixa mudar depois): "Postgres Vitalis" → postgres-vitalis.
+        nome: nomeDoConector(e.conector_slug),
         ...(exigeAcessoHub() ? acessoBanco.dadosDeConexao(empresa) : {}),
         ssl: "Preferido",
       },
       agente: { nome: `Qualificador ${e.nome}`, prompt: `hub/prompts/${empresa}.md`, ferramenta: ferramentaDoConector(e.conector_slug) },
     },
   };
+}
+
+/** Nome que, no Hub, gera exatamente este slug (o Hub deriva o slug do nome): postgres-horizonte → "Postgres Horizonte". */
+export const nomeDoConector = (slug: string) =>
+  slug
+    .split("-")
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join(" ");
+
+/**
+ * Grava o slug real do conector da empresa no Hub e gera de novo o prompt (o nome da ferramenta sai do slug).
+ * Para quando o Hub criou o conector com outro slug: ele deriva o slug do nome.
+ */
+export async function definirConector(empresa: string, slug: string) {
+  validarEmpresa(empresa);
+  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) throw new ErroApp(400, "conector", `Slug inválido: "${slug}" (letras minúsculas, números e hífens).`);
+  const atual = await db.one<{ conector_slug: string }>("select conector_slug from empresas where id = $1", [empresa]);
+  if (!atual) throw new ErroApp(404, "empresa", `Empresa "${empresa}" não existe.`);
+  await db.query("update empresas set conector_slug = $2 where id = $1", [empresa, slug]);
+  const [e] = await estado(empresa);
+  mkdirSync(join(HUB_DIR, "prompts"), { recursive: true });
+  writeFileSync(join(HUB_DIR, "prompts", `${empresa}.md`), gerarPrompt(e));
+  return { empresa, antes: atual.conector_slug, depois: slug, ferramenta: ferramentaDoConector(slug), prompt: `hub/prompts/${empresa}.md` };
 }
 
 export async function listar() {

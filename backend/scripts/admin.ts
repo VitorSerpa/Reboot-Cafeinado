@@ -17,6 +17,7 @@
  *   npm run listar-empresas                       → empresas, status e o que falta em cada uma
  *   npm run provisionar -- <empresa> [--recarregar-catalogo]  → cadastra ou completa a empresa a partir de dados/<empresa>/
  *   npm run status-empresa -- <empresa> <suspensa|ativa>       → suspende (ninguém entra) ou reativa
+ *   npm run definir-conector -- <empresa> <slug>  → grava o slug real do conector no Hub e gera de novo o prompt
  */
 import { env } from "../src/config/env.js";
 
@@ -167,11 +168,18 @@ try {
       }
       const c = r.hub.conector;
       console.log("\nNo Hub (uma conta, uma API Key; por empresa, um conector e um agente):");
-      console.log(`  1. Conector ${c.tipo}: nome "${c.nome}", slug ${c.slug}`);
+      console.log(`  1. Conector ${c.tipo}: nome "${c.nome}" (o Hub gera o slug ${c.slug} a partir desse nome)`);
       if (c.host) console.log(`     Host ${c.host} · Porta ${c.porta} · Banco ${c.banco} · Usuário ${c.usuario} · SSL Mode ${c.ssl}`);
       console.log("     A senha do usuário do banco quem cola é a pessoa (npm run acesso-banco -- <empresa> gera outra).");
       console.log(`  2. Agente "${r.hub.agente.nome}": prompt ${r.hub.agente.prompt}, só esse conector, Haiku 4.5, temperatura 0,2, Aprendizado desligado`);
       console.log(`  3. npm run definir-agente -- ${r.empresa} <uuid do agente>`);
+      break;
+    }
+    case "definir-conector": {
+      if (!arg || !descricao) throw new Error("Uso: npm run definir-conector -- <empresa> <slug do conector no Hub>");
+      const r = await chamar("POST", `/empresas/${encodeURIComponent(arg)}/conector`, { slug: descricao });
+      console.log(`Conector de ${r.empresa}: ${r.antes || "(nenhum)"} → ${r.depois}. Ferramenta: ${r.ferramenta}.`);
+      console.log(`Prompt gerado de novo em ${r.prompt}: atualize o System Prompt do agente no Hub.`);
       break;
     }
     case "status-empresa": {
@@ -183,7 +191,7 @@ try {
     default:
       console.error(
         "Comandos: gerar-token, listar-tokens, revogar-token, recarregar, exportar, acesso-banco, diagnosticar-banco, revogar-acesso-banco, " +
-          "listar-usuarios, definir-senha, criar-usuario, definir-agente, listar-empresas, provisionar, status-empresa",
+          "listar-usuarios, definir-senha, criar-usuario, definir-agente, listar-empresas, provisionar, status-empresa, definir-conector",
       );
       process.exit(1);
   }

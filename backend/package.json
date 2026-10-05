@@ -26,7 +26,8 @@
     "definir-agente": "tsx scripts/admin.ts definir-agente",
     "listar-empresas": "tsx scripts/admin.ts listar-empresas",
     "provisionar": "tsx scripts/admin.ts provisionar",
-    "status-empresa": "tsx scripts/admin.ts status-empresa"
+    "status-empresa": "tsx scripts/admin.ts status-empresa",
+    "definir-conector": "tsx scripts/admin.ts definir-conector"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",

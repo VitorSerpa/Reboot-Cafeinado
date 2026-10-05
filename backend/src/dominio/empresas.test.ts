@@ -22,7 +22,7 @@ test("os três dossiês do repositório são válidos", () => {
   for (const e of empresas.empresasComDossie()) {
     const d = empresas.lerDossie(e);
     assert.ok(d.usuarios.length >= 3, e);
-    assert.equal(d.conector_slug, `postgres-${e}`);
+    assert.match(d.conector_slug, /^postgres-[a-z0-9-]+$/, e);
   }
 });
 
@@ -62,13 +62,25 @@ test("o prompt de cada empresa usa o schema e a ferramenta dela, e nada de outra
   for (const e of lista) {
     const p = empresas.gerarPrompt(e);
     assert.ok(p.includes(`select contexto from hub_${e.id}.contexto`), e.id);
-    assert.ok(p.includes(`postgres_${e.id}_query`), e.id);
+    assert.ok(p.includes(empresas.ferramentaDoConector(e.conector_slug)), e.id);
     assert.ok(!/\{\{|<!--/.test(p), `${e.id}: marcador ou comentário sobrando`);
     for (const outra of lista.filter((o) => o.id !== e.id)) {
       assert.ok(!p.includes(`hub_${outra.id}`) && !p.includes(outra.nome), `${e.id} cita ${outra.id}`);
     }
     assert.ok(!/PagaFlow|DespesaCerta|ContaFechamento/.test(p) || e.id === "aurora", `${e.id}: sistema da Aurora no prompt`);
   }
+});
+
+test("definir-conector grava o slug real do Hub e gera o prompt com a ferramenta certa", async () => {
+  assert.equal(empresas.nomeDoConector("postgres-horizonte"), "Postgres Horizonte");
+  assert.equal(empresas.ferramentaDoConector("postgres-rede-vitalis"), "postgres_rede_vitalis_query");
+  await comoSistema(async () => {
+    const r = await empresas.definirConector("vitalis", "postgres-rede-vitalis");
+    assert.equal(r.ferramenta, "postgres_rede_vitalis_query");
+    const e = await db.one<{ conector_slug: string }>("select conector_slug from empresas where id = 'vitalis'");
+    assert.equal(e?.conector_slug, "postgres-rede-vitalis");
+    await assert.rejects(() => empresas.definirConector("vitalis", "Postgres Vitalis"), /inválido/);
+  });
 });
 
 test("status: em implantação até ter agente e login; ativa depois", async () => {

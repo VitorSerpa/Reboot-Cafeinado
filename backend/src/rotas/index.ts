@@ -179,6 +179,10 @@ rotas.post("/admin/empresas/:empresa/provisionar", soLocal, async (req, res) => 
   res.json(await empresas.provisionar(String(req.params.empresa), { recarregarCatalogo: Boolean(req.body?.recarregarCatalogo) }));
 });
 
+rotas.post("/admin/empresas/:empresa/conector", soLocal, async (req, res) => {
+  res.json(await empresas.definirConector(String(req.params.empresa), String(req.body?.slug ?? "")));
+});
+
 rotas.post("/admin/empresas/:empresa/status", soLocal, async (req, res) => {
   const status = String(req.body?.status ?? "");
   if (status !== "suspensa" && status !== "ativa") throw new ErroApp(400, "status", 'Status: "suspensa" ou "ativa".');
