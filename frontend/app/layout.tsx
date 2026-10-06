@@ -39,7 +39,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_MARCA }} />
       </head>
-      <body className="min-h-full flex flex-col">
+      {/* Extensões do navegador (ColorZilla, gerenciadores de senha) injetam atributos no <body> antes do React. */}
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         {children}
       </body>
     </html>
