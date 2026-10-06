@@ -573,12 +573,105 @@ label.rotulo {
   }
 }
 
-/* --- triagem --- */
+/* --- triagem: a lista à esquerda; o chamado em blocos (conversa no centro, encaminhamento e detalhes ao lado) --- */
+.conteudo.larga {
+  max-width: 1480px;
+}
 .triagem {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: 300px minmax(0, 1fr);
   gap: 20px;
   align-items: start;
+}
+.detalhe {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-areas:
+    "cabecalho cabecalho"
+    "conversa acao"
+    "conversa info";
+  grid-template-rows: auto auto 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.detalhe-cabecalho {
+  grid-area: cabecalho;
+}
+.detalhe-cabecalho p {
+  margin: 8px 0 0;
+}
+.detalhe-conversa {
+  grid-area: conversa;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.detalhe-acao {
+  grid-area: acao;
+}
+.detalhe-info {
+  grid-area: info;
+}
+/* A conversa rola sozinha; a caixa de resposta fica sempre à vista, logo abaixo. */
+.conversa-rolagem {
+  max-height: min(60vh, 620px);
+  min-height: 200px;
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+.subtitulo {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto-suave);
+  margin-bottom: 6px;
+}
+.divisor {
+  border: 0;
+  border-top: 1px solid var(--borda);
+  margin: 14px 0;
+}
+/* Ficha do chamado: rótulo em cima, valor embaixo (cabe na coluna estreita). */
+.ficha {
+  margin: 0;
+  font-size: 14px;
+}
+.ficha dt {
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+.ficha dd {
+  margin: 0 0 10px;
+  overflow-wrap: anywhere;
+}
+.ficha dd:last-child {
+  margin-bottom: 0;
+}
+details.diagnostico > summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+details.diagnostico > summary::-webkit-details-marker {
+  display: none;
+}
+details.diagnostico > summary h3 {
+  margin: 0;
+}
+details.diagnostico[open] > summary {
+  margin-bottom: 12px;
+}
+details.diagnostico .subtitulo {
+  margin-top: 12px;
+}
+@media (max-width: 1100px) {
+  .detalhe {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "cabecalho" "acao" "conversa" "info";
+    grid-template-rows: none;
+  }
 }
 .item-fila {
   display: block;

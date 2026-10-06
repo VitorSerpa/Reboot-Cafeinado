@@ -163,7 +163,7 @@ export default function Triagem() {
   return (
     <>
       <Cabecalho usuario={usuario} conectado={usuario ? conectado : undefined} />
-      <main className="conteudo">
+      <main className="conteudo larga">
         <div className="pilha">
           <div className="linha" style={{ justifyContent: "space-between" }}>
             <h1>Triagem</h1>
@@ -291,81 +291,50 @@ function PainelDetalhe({
   const podeConfirmar = r?.status === "pronto" && !!r.fila_sugerida;
   const rejeitado = chamado.status === "rejeitado";
   const nomeApp = (slug: string | null) => catalogo?.servicos.find((a) => a.slug === slug)?.nome ?? slug ?? "—";
+  const situacao = {
+    status: chamado.status,
+    resultado_status: r?.status ?? null,
+    qualificado_sem_ia: chamado.qualificado_sem_ia,
+    corrigiu: triagem?.corrigiu ?? null,
+  };
+
+  // A conversa tem rolagem própria e acompanha a mensagem mais recente.
+  const rolagem = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = rolagem.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [turnos.length, pendente]);
 
   return (
-    <div className="cartao pilha">
-      <div className="linha" style={{ justifyContent: "space-between" }}>
-        <h2>Chamado #{chamado.id}</h2>
-        <span className="suave">
-          {detalhe.solicitante} · enviado {hora(chamado.enviado_em)}
-        </span>
-      </div>
-
-      <section className="secao">
-        <h3>Sugestão do agente</h3>
-        {r?.status === "pronto" && (
+    <div className="detalhe">
+      <header className="cartao detalhe-cabecalho">
+        <div className="linha" style={{ justifyContent: "space-between" }}>
           <div className="linha">
-            <span className="selo verde">{nomeFila(r.fila_sugerida)}</span>
-            <div className="barra" title={`Confiança ${confianca}%`}>
-              <span style={{ width: `${confianca}%`, background: confianca >= 70 ? "var(--verde)" : "var(--amarelo)" }} />
-            </div>
-            <span className="suave">confiança {confianca}%</span>
+            <h2>Chamado #{chamado.id}</h2>
+            <SeloSituacao item={situacao} />
           </div>
-        )}
-        {r?.status === "abstencao" && (
-          <div className="aviso atencao">
-            <strong>{chamado.qualificado_sem_ia ? "Qualificado sem IA." : "O agente se absteve de sugerir a fila."}</strong>{" "}
-            {r.duvida}
-            {r.fila_sugerida && <> · Candidata: {nomeFila(r.fila_sugerida)} ({confianca}%)</>}
-          </div>
-        )}
-        {r?.status === "seguranca" && <div className="aviso erro">Possível incidente de segurança. {r.resumo}</div>}
-        {r?.status === "fora_do_escopo" && (
-          <div className="aviso atencao">
-            <strong>O assistente considerou o pedido fora do escopo do suporte</strong>
-            {rejeitado ? " e o encerrou sem enviar para a fila." : "."} {r.duvida && <>Motivo: {r.duvida}</>}
-          </div>
-        )}
-      </section>
+          <span className="suave">
+            {detalhe.solicitante} · enviado {hora(chamado.enviado_em)}
+          </span>
+        </div>
+        <p>{r?.resumo || chamado.texto_inicial}</p>
+      </header>
 
-      <section className="secao">
-        <h3>Chamado</h3>
-        <dl className="grade">
-          <dt>Resumo</dt>
-          <dd>{r?.resumo || chamado.texto_inicial}</dd>
-          <dt>Relato original</dt>
-          <dd>{chamado.texto_inicial}</dd>
-          <dt>Sistema</dt>
-          <dd>{nomeApp(r?.aplicacao ?? null)}</dd>
-          <dt>Categoria</dt>
-          <dd>{r?.categoria ?? "—"}</dd>
-          {camposInformados(r?.informacoes).map(([rotulo, valor]) => (
-            <Info key={rotulo} rotulo={rotulo} valor={valor} />
-          ))}
-          {!!r?.lacunas?.length && (
-            <>
-              <dt>Ficou faltando</dt>
-              <dd>{r.lacunas.join(", ")}</dd>
-            </>
-          )}
-          <dt>Perguntas feitas</dt>
-          <dd>{chamado.n_perguntas}</dd>
-        </dl>
-      </section>
-
-      <section className="secao">
-        <h3>Conversa com o solicitante</h3>
+      <section className="cartao secao detalhe-conversa">
+        <h3>Conversa com {detalhe.solicitante}</h3>
         <p className="suave">
           {rejeitado
             ? "A conversa foi encerrada. Se trouxer o pedido de volta para a fila, você responde aqui mesmo."
             : "O assistente qualificou o chamado nesta conversa. Daqui em diante, você responde aqui mesmo e o solicitante vê na hora."}
         </p>
-        <div className="chat" style={{ minHeight: 0 }}>
-          <Conversa turnos={turnos} visao="analista" />
-          {pendente && <div className="bolha analista propria">{pendente}</div>}
+        <div className="conversa-rolagem" ref={rolagem}>
+          <div className="chat" style={{ minHeight: 0 }}>
+            <Conversa turnos={turnos} visao="analista" />
+            {pendente && <div className="bolha analista propria">{pendente}</div>}
+          </div>
         </div>
         {!rejeitado && (
-          <div className="pilha" style={{ marginTop: 12 }}>
+          <div className="pilha">
             <textarea
               className="campo"
               rows={2}
@@ -392,8 +361,40 @@ function PainelDetalhe({
         )}
       </section>
 
-      <section className="secao">
-        <h3>Decisão</h3>
+      <section className="cartao secao detalhe-acao">
+        <h3>Encaminhamento</h3>
+        <div className="subtitulo">Sugestão do agente</div>
+        {r?.status === "pronto" && (
+          <div className="pilha" style={{ gap: 6 }}>
+            <span className="selo verde" style={{ alignSelf: "flex-start" }}>
+              {nomeFila(r.fila_sugerida)}
+            </span>
+            <div className="linha">
+              <div className="barra" title={`Confiança ${confianca}%`}>
+                <span style={{ width: `${confianca}%`, background: confianca >= 70 ? "var(--verde)" : "var(--amarelo)" }} />
+              </div>
+              <span className="suave">confiança {confianca}%</span>
+            </div>
+          </div>
+        )}
+        {r?.status === "abstencao" && (
+          <div className="aviso atencao">
+            <strong>{chamado.qualificado_sem_ia ? "Qualificado sem IA." : "O agente se absteve de sugerir a fila."}</strong>{" "}
+            {r.duvida}
+            {r.fila_sugerida && <> · Candidata: {nomeFila(r.fila_sugerida)} ({confianca}%)</>}
+          </div>
+        )}
+        {r?.status === "seguranca" && <div className="aviso erro">Possível incidente de segurança. {r.resumo}</div>}
+        {r?.status === "fora_do_escopo" && (
+          <div className="aviso atencao">
+            <strong>O assistente considerou o pedido fora do escopo do suporte</strong>
+            {rejeitado ? " e o encerrou sem enviar para a fila." : "."} {r.duvida && <>Motivo: {r.duvida}</>}
+          </div>
+        )}
+        {!r && <p className="suave">Sem sugestão do agente.</p>}
+
+        <hr className="divisor" />
+        <div className="subtitulo">Decisão</div>
         {triagem ? (
           <div className="aviso ok">
             Encaminhado para <strong>{nomeFila(triagem.fila_final)}</strong>
@@ -413,79 +414,117 @@ function PainelDetalhe({
         ) : (
           <div className="pilha">
             {podeConfirmar && (
-              <button
-                className="botao"
-                onClick={() => aoDecidir(() => api<Detalhe>(`/triagem/${chamado.id}/confirmar`, { corpo: {} }))}
-              >
-                Confirmar: {nomeFila(r!.fila_sugerida)}
-              </button>
+              <>
+                <button
+                  className="botao"
+                  onClick={() => aoDecidir(() => api<Detalhe>(`/triagem/${chamado.id}/confirmar`, { corpo: {} }))}
+                >
+                  Confirmar: {nomeFila(r!.fila_sugerida)}
+                </button>
+                <span className="suave">ou escolha outra fila:</span>
+              </>
             )}
-            <div className="linha">
-              <select className="campo" style={{ flex: "1 1 220px" }} value={fila} onChange={(e) => setFila(e.target.value)}>
-                <option value="">Escolha a fila…</option>
-                {catalogo?.filas.map((f) => (
-                  <option key={f.slug} value={f.slug}>
-                    {f.nome}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="campo"
-                style={{ flex: "2 1 280px" }}
-                placeholder="Por que esta é a fila certa? (uma frase)"
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-              />
-              <button
-                className="botao secundario"
-                disabled={!fila || !motivo.trim()}
-                onClick={() => aoDecidir(() => api<Detalhe>(`/triagem/${chamado.id}/corrigir`, { corpo: { fila, motivo } }))}
-              >
-                {podeConfirmar ? "Corrigir e encaminhar" : "Encaminhar"}
-              </button>
-            </div>
+            <select className="campo" value={fila} onChange={(e) => setFila(e.target.value)}>
+              <option value="">Escolha a fila…</option>
+              {catalogo?.filas.map((f) => (
+                <option key={f.slug} value={f.slug}>
+                  {f.nome}
+                </option>
+              ))}
+            </select>
+            <input
+              className="campo"
+              placeholder="Por que esta é a fila certa? (uma frase)"
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+            />
+            <button
+              className="botao secundario"
+              disabled={!fila || !motivo.trim()}
+              onClick={() => aoDecidir(() => api<Detalhe>(`/triagem/${chamado.id}/corrigir`, { corpo: { fila, motivo } }))}
+            >
+              {podeConfirmar ? "Corrigir e encaminhar" : "Encaminhar"}
+            </button>
           </div>
         )}
       </section>
 
-      {chamado.ajustes.length > 0 && (
-        <section className="secao">
-          <h3>O que o app ajustou</h3>
-          <ul>
-            {chamado.ajustes.map((a, i) => (
-              <li key={i}>{a}</li>
+      <div className="pilha detalhe-info">
+        <section className="cartao secao">
+          <h3>Detalhes</h3>
+          <dl className="ficha">
+            <dt>Relato original</dt>
+            <dd>{chamado.texto_inicial}</dd>
+            <dt>Sistema</dt>
+            <dd>{nomeApp(r?.aplicacao ?? null)}</dd>
+            <dt>Categoria</dt>
+            <dd>{r?.categoria ?? "—"}</dd>
+            {camposInformados(r?.informacoes).map(([rotulo, valor]) => (
+              <Info key={rotulo} rotulo={rotulo} valor={valor} />
             ))}
-          </ul>
+            {!!r?.lacunas?.length && (
+              <>
+                <dt>Ficou faltando</dt>
+                <dd>{r.lacunas.join(", ")}</dd>
+              </>
+            )}
+            <dt>Perguntas feitas</dt>
+            <dd>{chamado.n_perguntas}</dd>
+          </dl>
         </section>
-      )}
 
-      <section className="secao">
-        <h3>Consultas do agente ao catálogo ({consultas.length})</h3>
-        {consultas.length === 0 && <p className="suave">O agente não consultou o catálogo neste chamado.</p>}
-        <div className="pilha" style={{ gap: 6 }}>
-          {consultas.map((c, i) => (
-            <Consulta key={i} c={c} />
-          ))}
-        </div>
-      </section>
+        <details className="cartao secao diagnostico">
+          <summary>
+            <h3>Diagnóstico do agente</h3>
+            <span className="suave">
+              {[
+                `${consultas.length} consulta${consultas.length === 1 ? "" : "s"}`,
+                chamado.ajustes.length > 0 && `${chamado.ajustes.length} ajuste${chamado.ajustes.length === 1 ? "" : "s"}`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </summary>
 
-      {outras.length > 0 && (
-        <section className="secao">
-          <h3>Outras ferramentas do agente ({outras.length})</h3>
-          <p className="suave">
-            Não são consultas ao catálogo. <code>log_decision</code> e semelhantes vêm do Aprendizado do agente, que grava memória entre conversas.
-          </p>
+          {chamado.ajustes.length > 0 && (
+            <>
+              <div className="subtitulo">O que o app ajustou</div>
+              <ul>
+                {chamado.ajustes.map((a, i) => (
+                  <li key={i}>{a}</li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          <div className="subtitulo">Consultas ao catálogo ({consultas.length})</div>
+          {consultas.length === 0 && <p className="suave">O agente não consultou o catálogo neste chamado.</p>}
           <div className="pilha" style={{ gap: 6 }}>
-            {outras.map((c, i) => (
+            {consultas.map((c, i) => (
               <Consulta key={i} c={c} />
             ))}
           </div>
-        </section>
-      )}
 
-      <p className="suave">
-        Agente: {chamado.tokens_input + chamado.tokens_output} tokens · {(chamado.latencia_ms / 1000).toFixed(1)} s
-      </p>
+          {outras.length > 0 && (
+            <>
+              <div className="subtitulo">Outras ferramentas ({outras.length})</div>
+              <p className="suave">
+                Não são consultas ao catálogo. <code>log_decision</code> e semelhantes vêm do Aprendizado do agente, que grava memória entre
+                conversas.
+              </p>
+              <div className="pilha" style={{ gap: 6 }}>
+                {outras.map((c, i) => (
+                  <Consulta key={i} c={c} />
+                ))}
+              </div>
+            </>
+          )}
+
+          <p className="suave">
+            {chamado.tokens_input + chamado.tokens_output} tokens · {(chamado.latencia_ms / 1000).toFixed(1)} s
+          </p>
+        </details>
+      </div>
     </div>
   );
 }
