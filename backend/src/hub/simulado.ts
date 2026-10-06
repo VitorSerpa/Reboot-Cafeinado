@@ -9,6 +9,7 @@ import { HubIndisponivel, type ClienteHub, type ResultadoTurno, type ToolCall } 
  *   "#hub-fora"   → o Hub fica indisponível
  *   "#json-ruim"  → o agente responde fora do formato
  *   "#tool-erro"  → a consulta ao catálogo falha
+ *   "#fora"       → o agente considera o pedido fora do escopo (na descrição; depois de perguntar, o app vira abstenção)
  */
 const sessoes = new Map<string, string[]>();
 
@@ -33,6 +34,20 @@ function decidir(textos: string[]) {
   const tudo = normalizar(textos.join(" \n "));
   const ultima = normalizar(textos.at(-1) ?? "");
   const perguntasFeitas = textos.length - 1;
+
+  if (ultima.includes("#fora")) {
+    return {
+      mensagem_ao_usuario:
+        "Este canal é para problemas com os sistemas e os acessos da empresa. Se for o caso, conte o que aconteceu: qual sistema, o que você tentava fazer e o que apareceu.",
+      status: "fora_do_escopo",
+      aplicacao: null,
+      categoria: null,
+      fila_sugerida: null,
+      confianca: 0,
+      duvida: "(simulado) O pedido não é um problema com sistema, acesso ou equipamento.",
+      resumo: `(simulado) ${textos.at(-1)?.slice(0, 160) ?? ""}`,
+    };
+  }
 
   if (/invadid|hacke|acesso indevido|alguem entrou/.test(tudo)) {
     return {
@@ -110,7 +125,11 @@ export const hubSimulado: ClienteHub = {
   async conversar({ mensagem, sessaoExterna, aoProgresso }): Promise<ResultadoTurno> {
     const id = sessaoExterna;
     const textos = sessoes.get(id) ?? [];
-    const conteudo = mensagem.split("\n").filter((l) => !l.startsWith("[") && !/^(Relato inicial|Resposta) do solicitante:?$/.test(l.trim())).join("\n").trim();
+    const conteudo = mensagem
+      .split("\n")
+      .filter((l) => !l.startsWith("[") && !/^(Relato inicial|Novo relato|Resposta) do solicitante\b.*:$/.test(l.trim()))
+      .join("\n")
+      .trim();
     textos.push(conteudo);
     sessoes.set(id, textos);
 
@@ -126,7 +145,10 @@ export const hubSimulado: ClienteHub = {
     await new Promise((r) => setTimeout(r, 400));
     aoProgresso?.({ fase: "escrevendo" });
     await new Promise((r) => setTimeout(r, 200));
-    const texto = n.includes("#json-ruim") ? "Claro! Vou te ajudar com isso." : JSON.stringify(decidir(textos));
+    const decisao = decidir(textos);
+    // Depois de uma rejeição, a próxima mensagem é um relato novo: a conversa recomeça do zero.
+    if (decisao.status === "fora_do_escopo") sessoes.set(id, []);
+    const texto = n.includes("#json-ruim") ? "Claro! Vou te ajudar com isso." : JSON.stringify(decisao);
 
     return {
       sessionId: `sim-${randomUUID()}`,

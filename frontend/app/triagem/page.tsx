@@ -16,7 +16,8 @@ interface ItemFila {
   id: number;
   status: Chamado["status"];
   texto_inicial: string;
-  enviado_em: string;
+  enviado_em: string | null;
+  atualizado_em: string;
   qualificado_sem_ia: boolean;
   resultado_status: string | null;
   fila_sugerida: string | null;
@@ -78,6 +79,7 @@ function agruparPorFila(fila: ItemFila[], catalogo: Catalogo | null): GrupoFila[
 }
 
 function SeloSituacao({ item }: { item: Pick<ItemFila, "status" | "resultado_status" | "qualificado_sem_ia" | "corrigiu"> }) {
+  if (item.status === "rejeitado") return <span className="selo">Rejeitado</span>;
   if (item.status === "triado") return <span className="selo">{item.corrigiu ? "Triado · corrigido" : "Triado · confirmado"}</span>;
   if (item.resultado_status === "seguranca") return <span className="selo vermelho">Segurança</span>;
   if (item.qualificado_sem_ia) return <span className="selo">Sem IA</span>;
@@ -139,6 +141,22 @@ export default function Triagem() {
 
   const nomeFila = (slug: string | null) => catalogo?.filas.find((f) => f.slug === slug)?.nome ?? slug ?? "—";
   const pendentes = fila.filter((f) => f.status === "aguardando_triagem").length;
+  // Rejeitados (fora do escopo) ficam à parte: não são trabalho da fila, mas o analista confere e pode trazer de volta.
+  const naFila = fila.filter((f) => f.status !== "rejeitado");
+  const rejeitados = fila.filter((f) => f.status === "rejeitado");
+  const item = (f: ItemFila, semFila: boolean) => (
+    <button key={f.id} className={`item-fila ${selecionado === f.id ? "ativo" : ""}`} onClick={() => selecionar(f.id)}>
+      <div className="linha" style={{ justifyContent: "space-between" }}>
+        <strong>#{f.id}</strong>
+        <SeloSituacao item={f} />
+      </div>
+      <div className="resumo">{f.resumo || f.texto_inicial}</div>
+      <div className="suave">
+        {f.solicitante} · {hora(f.enviado_em ?? f.atualizado_em)}
+        {semFila && f.fila_sugerida ? ` · candidata ${nomeFila(f.fila_sugerida)}` : ""}
+      </div>
+    </button>
+  );
   // Nada da tela aparece antes de a sessão ser conferida (e do perfil certo).
   if (!usuario) return <VerificandoSessao erro={erroSessao} />;
 
@@ -157,8 +175,8 @@ export default function Triagem() {
 
           <div className="triagem">
             <div className="pilha">
-              {fila.length === 0 && <div className="cartao suave">Nenhum chamado enviado ainda.</div>}
-              {agruparPorFila(fila, catalogo).map((g) => (
+              {naFila.length === 0 && <div className="cartao suave">Nenhum chamado enviado ainda.</div>}
+              {agruparPorFila(naFila, catalogo).map((g) => (
                 <details key={g.slug ?? "sem-fila"} open className="flex flex-col gap-2">
                   <summary
                     className={`flex cursor-pointer list-none items-baseline justify-between gap-2 border-l-[3px] py-1.5 pl-2.5 font-titulo text-[15px] font-semibold [&::-webkit-details-marker]:hidden ${
@@ -173,22 +191,22 @@ export default function Triagem() {
                     </span>
                   </summary>
                   <div className="pilha mt-2" style={{ gap: 8 }}>
-                    {g.itens.map((f) => (
-                      <button key={f.id} className={`item-fila ${selecionado === f.id ? "ativo" : ""}`} onClick={() => selecionar(f.id)}>
-                        <div className="linha" style={{ justifyContent: "space-between" }}>
-                          <strong>#{f.id}</strong>
-                          <SeloSituacao item={f} />
-                        </div>
-                        <div className="resumo">{f.resumo || f.texto_inicial}</div>
-                        <div className="suave">
-                          {f.solicitante} · {hora(f.enviado_em)}
-                          {!g.slug && f.fila_sugerida ? ` · candidata ${nomeFila(f.fila_sugerida)}` : ""}
-                        </div>
-                      </button>
-                    ))}
+                    {g.itens.map((f) => item(f, !g.slug))}
                   </div>
                 </details>
               ))}
+              {rejeitados.length > 0 && (
+                <details className="flex flex-col gap-2">
+                  <summary className="flex cursor-pointer list-none items-baseline justify-between gap-2 border-l-[3px] border-cinza py-1.5 pl-2.5 font-titulo text-[15px] font-semibold [&::-webkit-details-marker]:hidden">
+                    <span>Rejeitados pelo assistente</span>
+                    <span className="suave whitespace-nowrap font-sans text-xs font-normal">{rejeitados.length} fora do escopo</span>
+                  </summary>
+                  <p className="suave mt-2">Não foram para a fila. Confira se nenhum é chamado de verdade: dá para trazer de volta.</p>
+                  <div className="pilha mt-2" style={{ gap: 8 }}>
+                    {rejeitados.map((f) => item(f, false))}
+                  </div>
+                </details>
+              )}
             </div>
 
             <div>
@@ -271,6 +289,7 @@ function PainelDetalhe({
   const outras = ferramentas.filter((c) => !eCatalogo(c.tool));
   const confianca = Math.round((r?.confianca ?? 0) * 100);
   const podeConfirmar = r?.status === "pronto" && !!r.fila_sugerida;
+  const rejeitado = chamado.status === "rejeitado";
   const nomeApp = (slug: string | null) => catalogo?.servicos.find((a) => a.slug === slug)?.nome ?? slug ?? "—";
 
   return (
@@ -301,6 +320,12 @@ function PainelDetalhe({
           </div>
         )}
         {r?.status === "seguranca" && <div className="aviso erro">Possível incidente de segurança. {r.resumo}</div>}
+        {r?.status === "fora_do_escopo" && (
+          <div className="aviso atencao">
+            <strong>O assistente considerou o pedido fora do escopo do suporte</strong>
+            {rejeitado ? " e o encerrou sem enviar para a fila." : "."} {r.duvida && <>Motivo: {r.duvida}</>}
+          </div>
+        )}
       </section>
 
       <section className="secao">
@@ -331,36 +356,40 @@ function PainelDetalhe({
       <section className="secao">
         <h3>Conversa com o solicitante</h3>
         <p className="suave">
-          O assistente qualificou o chamado nesta conversa. Daqui em diante, você responde aqui mesmo e o solicitante vê na hora.
+          {rejeitado
+            ? "A conversa foi encerrada. Se trouxer o pedido de volta para a fila, você responde aqui mesmo."
+            : "O assistente qualificou o chamado nesta conversa. Daqui em diante, você responde aqui mesmo e o solicitante vê na hora."}
         </p>
         <div className="chat" style={{ minHeight: 0 }}>
           <Conversa turnos={turnos} visao="analista" />
           {pendente && <div className="bolha analista propria">{pendente}</div>}
         </div>
-        <div className="pilha" style={{ marginTop: 12 }}>
-          <textarea
-            className="campo"
-            rows={2}
-            maxLength={MAX_MENSAGEM}
-            placeholder={`Responder para ${detalhe.solicitante}…`}
-            value={texto}
-            disabled={!!pendente}
-            onChange={(e) => setTexto(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                responder();
-              }
-            }}
-          />
-          {erroMensagem && <div className="aviso erro">{erroMensagem}</div>}
-          <div className="linha" style={{ justifyContent: "space-between" }}>
-            <span className="suave">{socket ? "Enter envia · Shift+Enter quebra linha" : "Sem conexão em tempo real. Tentando reconectar…"}</span>
-            <button className="botao" onClick={responder} disabled={!texto.trim() || !!pendente || !socket}>
-              Enviar
-            </button>
+        {!rejeitado && (
+          <div className="pilha" style={{ marginTop: 12 }}>
+            <textarea
+              className="campo"
+              rows={2}
+              maxLength={MAX_MENSAGEM}
+              placeholder={`Responder para ${detalhe.solicitante}…`}
+              value={texto}
+              disabled={!!pendente}
+              onChange={(e) => setTexto(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  responder();
+                }
+              }}
+            />
+            {erroMensagem && <div className="aviso erro">{erroMensagem}</div>}
+            <div className="linha" style={{ justifyContent: "space-between" }}>
+              <span className="suave">{socket ? "Enter envia · Shift+Enter quebra linha" : "Sem conexão em tempo real. Tentando reconectar…"}</span>
+              <button className="botao" onClick={responder} disabled={!texto.trim() || !!pendente || !socket}>
+                Enviar
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
       <section className="secao">
@@ -370,6 +399,16 @@ function PainelDetalhe({
             Encaminhado para <strong>{nomeFila(triagem.fila_final)}</strong>
             {triagem.corrigiu ? " (corrigido pelo analista)" : " (sugestão confirmada)"}
             {triagem.motivo && <> — {triagem.motivo}</>}
+          </div>
+        ) : rejeitado ? (
+          <div className="pilha">
+            <p className="suave">Se for um chamado de verdade, traga de volta: ele entra na fila como abstenção, e você escolhe a fila.</p>
+            <button
+              className="botao secundario"
+              onClick={() => aoDecidir(() => api<Detalhe>(`/triagem/${chamado.id}/resgatar`, { corpo: {} }))}
+            >
+              Mandar para a fila
+            </button>
           </div>
         ) : (
           <div className="pilha">
