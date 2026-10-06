@@ -23,6 +23,8 @@ import { encerrarSessoesDoUsuario } from "./usuarios.js";
 
 export const HUB_DIR = join(DADOS_DIR, "..", "hub");
 const MODELO_PROMPT = join(HUB_DIR, "prompt-qualificador.modelo.md");
+/** Onde ficam os prompts gerados. Os testes apontam para uma pasta temporária, para não reescrever os do repositório. */
+const pastaPrompts = () => process.env.PROMPTS_DIR || join(HUB_DIR, "prompts");
 
 const SLUG = /^[a-z][a-z0-9_]{1,30}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -239,8 +241,8 @@ export async function provisionar(empresa: string, opcoes: { recarregarCatalogo?
   }
   await acessoBanco.atualizarVisoes();
 
-  mkdirSync(join(HUB_DIR, "prompts"), { recursive: true });
-  const arquivoPrompt = join(HUB_DIR, "prompts", `${empresa}.md`);
+  mkdirSync(pastaPrompts(), { recursive: true });
+  const arquivoPrompt = join(pastaPrompts(), `${empresa}.md`);
   writeFileSync(arquivoPrompt, gerarPrompt(e));
   passos.push({ passo: "prompt do agente", ok: true, detalhe: `hub/prompts/${empresa}.md (ferramenta ${ferramentaDoConector(e.conector_slug)})` });
 
@@ -292,8 +294,8 @@ export async function definirConector(empresa: string, slug: string) {
   if (!atual) throw new ErroApp(404, "empresa", `Empresa "${empresa}" não existe.`);
   await db.query("update empresas set conector_slug = $2 where id = $1", [empresa, slug]);
   const [e] = await estado(empresa);
-  mkdirSync(join(HUB_DIR, "prompts"), { recursive: true });
-  writeFileSync(join(HUB_DIR, "prompts", `${empresa}.md`), gerarPrompt(e));
+  mkdirSync(pastaPrompts(), { recursive: true });
+  writeFileSync(join(pastaPrompts(), `${empresa}.md`), gerarPrompt(e));
   return { empresa, antes: atual.conector_slug, depois: slug, ferramenta: ferramentaDoConector(slug), prompt: `hub/prompts/${empresa}.md` };
 }
 
