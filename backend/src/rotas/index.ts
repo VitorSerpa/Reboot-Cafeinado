@@ -261,6 +261,10 @@ rotas.post("/triagem/:id/confirmar", exigirLogin, exigirPerfil("analista"), asyn
   res.json(await triagem.confirmar(req.usuario!, idDe(req)));
 });
 
+rotas.post("/triagem/:id/resgatar", exigirLogin, exigirPerfil("analista"), async (req, res) => {
+  res.json(await triagem.resgatar(req.usuario!, idDe(req)));
+});
+
 rotas.post("/triagem/:id/corrigir", exigirLogin, exigirPerfil("analista"), async (req, res) => {
   res.json(await triagem.corrigir(req.usuario!, idDe(req), String(req.body?.fila ?? ""), String(req.body?.motivo ?? "")));
 });

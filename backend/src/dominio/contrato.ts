@@ -25,6 +25,11 @@ const normalizar = (s: string) =>
     .replace(/[̀-ͯ]/g, "");
 
 export const TETO_PERGUNTAS = 3;
+/** Na segunda rejeição seguida, o pedido é encerrado sem ir para a fila. */
+export const LIMITE_REJEICOES = 2;
+
+/** Menos de 3 letras: não há o que qualificar, e não vale gastar o agente. */
+export const semSentido = (texto: string) => (texto.match(/\p{L}/gu)?.length ?? 0) < 3;
 export const LIMIAR_CONFIANCA = 0.7;
 /** Com discriminador sem resposta, a confiança não passa disto (força abstenção). */
 export const TETO_SEM_DISCRIMINADOR = 0.6;
@@ -34,7 +39,7 @@ const textoOuNulo = z.string().nullish().transform((v) => (v && v.trim() ? v.tri
 /** Contrato de saída do agente (§3.6 do plano principal). Tolerante a campos ausentes. */
 export const ContratoAgente = z.object({
   mensagem_ao_usuario: z.string().min(1),
-  status: z.enum(["perguntando", "pronto", "abstencao", "seguranca"]),
+  status: z.enum(["perguntando", "pronto", "abstencao", "seguranca", "fora_do_escopo"]),
   aplicacao: textoOuNulo,
   categoria: textoOuNulo,
   informacoes: z.record(z.string(), z.unknown()).nullish().transform((v) => v ?? {}),
@@ -96,6 +101,21 @@ export function aplicarRegras(original: Contrato, ctx: ContextoRegras): { contra
   };
 
   if (c.status === "seguranca") return { contrato: c, ajustes };
+
+  // Rejeitar só vale na descrição do problema. Depois que o agente já perguntou, é um chamado real em andamento:
+  // vai para o analista, nunca some.
+  if (c.status === "fora_do_escopo") {
+    if (ctx.perguntasAntes > 0) {
+      abster(
+        "O agente considerou o pedido fora do escopo depois de já ter perguntado; o app mandou para a triagem humana.",
+        "O agente considerou o pedido fora do escopo no meio da conversa.",
+      );
+    } else {
+      c.fila_sugerida = null;
+      c.confianca = 0;
+      return { contrato: c, ajustes };
+    }
+  }
 
   if (c.status === "perguntando" && ctx.perguntasAntes >= TETO_PERGUNTAS) {
     abster(`Limite de ${TETO_PERGUNTAS} perguntas atingido; o app encerrou a conversa.`, "Informações insuficientes após o limite de perguntas.");

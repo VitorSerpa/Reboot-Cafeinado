@@ -61,7 +61,7 @@ export interface ToolCall {
 
 export interface Resultado {
   mensagem_ao_usuario: string;
-  status: "perguntando" | "pronto" | "abstencao" | "seguranca";
+  status: "perguntando" | "pronto" | "abstencao" | "seguranca" | "fora_do_escopo";
   aplicacao: string | null;
   categoria: string | null;
   informacoes: Record<string, unknown>;
@@ -75,7 +75,8 @@ export interface Resultado {
 
 export interface Chamado {
   id: number;
-  status: "qualificando" | "aguardando_triagem" | "triado";
+  /** `rejeitado`: o agente considerou fora do escopo duas vezes seguidas; não foi para a fila. */
+  status: "qualificando" | "aguardando_triagem" | "triado" | "rejeitado";
   texto_inicial: string;
   n_perguntas: number;
   resultado: Resultado | null;

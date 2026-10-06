@@ -121,7 +121,8 @@ create table if not exists procedimentos (
   primary key (empresa_id, slug)
 );
 
--- status: qualificando (com o agente) → aguardando_triagem (com o suporte, no mesmo chat) → triado
+-- status: qualificando (com o agente) → aguardando_triagem (com o suporte, no mesmo chat) → triado.
+-- rejeitado: o agente considerou fora do escopo duas vezes seguidas; não entra na fila, e o analista pode trazer de volta.
 create table if not exists chamados (
   id                  serial primary key,
   empresa_id          text not null references empresas(id),
@@ -161,6 +162,9 @@ alter table turnos add column if not exists hub_sessao text;
 alter table turnos add column if not exists autor_id text references usuarios(id);
 alter table turnos drop constraint if exists turnos_papel_check;
 alter table turnos add constraint turnos_papel_check check (papel in ('solicitante', 'agente', 'analista', 'sistema'));
+
+-- Rejeições seguidas do agente (fora do escopo). Volta a zero quando o solicitante descreve um problema de verdade.
+alter table chamados add column if not exists rejeicoes int not null default 0;
 
 -- Não existe mais o passo "enviar para o suporte": o que ficou parado nele entra na fila.
 update chamados set status = 'aguardando_triagem', enviado_em = coalesce(enviado_em, atualizado_em)
