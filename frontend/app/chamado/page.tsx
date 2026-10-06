@@ -8,6 +8,7 @@ import { api, ErroApi, type CampoContingencia, type Catalogo, type Chamado, type
 import { camposInformados } from "@/lib/informacoes";
 import { pedir, textoDaFase, useTempoReal } from "@/lib/tempo-real/socket";
 import type { EstadoChamado, FaseAgente } from "@/lib/tempo-real/tipos";
+import { useMarca } from "@/lib/useMarca";
 
 const ABRANGENCIA = [
   ["so_eu", "Só comigo"],
@@ -37,6 +38,7 @@ const maisNovo = (atual: EstadoChamado | null, chegou: EstadoChamado) =>
 
 export default function AbrirChamado() {
   const { usuario, erro: erroSessao } = useSessao("solicitante");
+  const marca = useMarca();
   const { socket, conectado } = useTempoReal(usuario?.id ?? null);
   const [estado, setEstado] = useState<EstadoChamado | null>(null);
   const [texto, setTexto] = useState("");
@@ -158,7 +160,7 @@ export default function AbrirChamado() {
       <main className="conteudo" style={{ maxWidth: 760 }}>
         <div className="pilha">
           <div className="linha" style={{ justifyContent: "space-between" }}>
-            <h1>{chamado ? `Chamado #${chamado.id}` : "Abrir um chamado"}</h1>
+            <h1>{chamado ? `Chamado #${chamado.id}` : (marca?.boasVindas.titulo ?? "Abrir um chamado")}</h1>
             {chamado && (
               <button className="botao secundario" onClick={novo} disabled={!!pendente}>
                 Novo chamado
@@ -169,15 +171,15 @@ export default function AbrirChamado() {
           <div className="cartao pilha">
             {!estado && !pendente && (
               <p className="suave">
-                Conte o que está acontecendo do jeito que você falaria com um colega. Não precisa saber o nome técnico nem a equipe certa: o assistente
-                pergunta só o que faltar.
+                {marca?.boasVindas.texto ??
+                  "Conte o que está acontecendo do jeito que você falaria com um colega. Não precisa saber o nome técnico nem a equipe certa: o assistente pergunta só o que faltar."}
               </p>
             )}
 
             <div className="chat">
               {estado && <Conversa turnos={estado.turnos} visao="solicitante" />}
               {mostrarPendente && <div className="bolha solicitante propria">{pendente}</div>}
-              {pendente && !comSuporte && <div className="digitando">{textoDaFase(fase)}</div>}
+              {pendente && !comSuporte && <div className="digitando">{textoDaFase(fase, marca?.assistente)}</div>}
             </div>
 
             {erro && <div className="aviso erro">{erro}</div>}
@@ -221,7 +223,7 @@ export default function AbrirChamado() {
                       ? "Mensagem para o suporte…"
                       : chamado
                         ? "Sua resposta…"
-                        : "Ex.: não consigo lançar o pagamento de um fornecedor no portal"
+                        : (marca?.boasVindas.exemplo ?? "Ex.: não consigo lançar o pagamento de um fornecedor no portal")
                   }
                   value={texto}
                   disabled={!!pendente}

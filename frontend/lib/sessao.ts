@@ -1,3 +1,5 @@
+import { aplicarMarca } from "@/lib/marcas";
+
 /**
  * Token de sessão desta aba (sessionStorage: cada aba tem o seu). O cookie de sessão é um só por navegador;
  * com o token, a aba do suporte continua como o suporte mesmo que outra aba entre como solicitante.
@@ -22,7 +24,9 @@ export function guardarTokenDaAba(token: string | undefined) {
   }
 }
 
+/** Esquece a sessão da aba e, com ela, a marca da empresa: a tela de entrada volta à identidade Kaffa. */
 export function esquecerTokenDaAba() {
+  aplicarMarca(null);
   try {
     window.sessionStorage.removeItem(CHAVE);
   } catch {

@@ -162,7 +162,7 @@ export default function Triagem() {
                 <details key={g.slug ?? "sem-fila"} open className="flex flex-col gap-2">
                   <summary
                     className={`flex cursor-pointer list-none items-baseline justify-between gap-2 border-l-[3px] py-1.5 pl-2.5 font-titulo text-[15px] font-semibold [&::-webkit-details-marker]:hidden ${
-                      g.slug ? "border-laranja" : "border-cinza"
+                      g.slug ? "border-destaque" : "border-cinza"
                     }`}
                   >
                     <span>{g.slug ? nomeFila(g.slug) : "Sem fila definida"}</span>

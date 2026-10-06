@@ -94,17 +94,17 @@ export function useTempoReal(usuarioId: string | null) {
 }
 
 /** Texto que o solicitante vê enquanto o agente trabalha. */
-export function textoDaFase(fase: FaseAgente | null): string {
+export function textoDaFase(fase: FaseAgente | null, quem = "O assistente"): string {
   switch (fase?.fase) {
     case "consultando":
       return /(catalogo|contexto|query|run_query|read_file|obter)/i.test(fase.ferramenta)
-        ? "O assistente está consultando o catálogo da empresa…"
-        : "O assistente está usando uma ferramenta…";
+        ? `${quem} está consultando o catálogo da empresa…`
+        : `${quem} está usando uma ferramenta…`;
     case "escrevendo":
-      return "O assistente está escrevendo…";
+      return `${quem} está escrevendo…`;
     case "tentando_de_novo":
-      return "O assistente está organizando a resposta…";
+      return `${quem} está organizando a resposta…`;
     default:
-      return "O assistente está analisando seu relato…";
+      return `${quem} está analisando seu relato…`;
   }
 }

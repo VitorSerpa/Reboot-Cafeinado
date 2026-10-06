@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { Cabecalho } from "@/components/Cabecalho";
 import { api, type Usuario } from "@/lib/api";
+import { aplicarMarca } from "@/lib/marcas";
 import { guardarTokenDaAba } from "@/lib/sessao";
 
 /** Os dois tipos de login. O suporte é o perfil `analista` no banco. */
@@ -15,7 +16,10 @@ const TIPOS = [
 
 const destino = (u: Usuario) => (u.perfil === "analista" ? "/triagem" : "/chamado");
 
-/** Entrada: login com e-mail e senha, escolhendo o tipo (solicitante ou suporte). A sessão fica nesta aba. */
+/**
+ * Entrada: login com e-mail e senha, escolhendo o tipo (solicitante ou suporte). A sessão fica nesta aba.
+ * A entrada é sempre Kaffa; o visual da empresa entra depois do login (useSessao).
+ */
 export default function Entrada() {
   const router = useRouter();
   const [perfil, setPerfil] = useState<Usuario["perfil"]>("solicitante");
@@ -32,8 +36,11 @@ export default function Entrada() {
         guardarTokenDaAba(u.token);
         router.replace(destino(u));
       })
-      // Sem sessão: se a tela anterior mandou para cá porque a sessão acabou, avisa.
-      .catch(() => setEncerrada(new URLSearchParams(window.location.search).get("sessao") === "encerrada"));
+      // Sem sessão: volta à identidade Kaffa e, se a tela anterior mandou para cá porque a sessão acabou, avisa.
+      .catch(() => {
+        aplicarMarca(null);
+        setEncerrada(new URLSearchParams(window.location.search).get("sessao") === "encerrada");
+      });
   }, [router]);
 
   async function entrar(e: FormEvent) {
@@ -77,7 +84,7 @@ export default function Entrada() {
                     setErro(null);
                   }}
                   className={`cursor-pointer rounded-md px-3 py-2 font-titulo text-sm font-semibold transition-colors ${
-                    perfil === t.perfil ? "bg-laranja text-white" : "text-cinza hover:text-texto"
+                    perfil === t.perfil ? "bg-destaque text-destaque-texto" : "text-cinza hover:text-texto"
                   }`}
                 >
                   {t.rotulo}

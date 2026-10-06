@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { api, ErroApi, type Usuario } from "@/lib/api";
+import { aplicarMarca } from "@/lib/marcas";
 import { esquecerTokenDaAba, guardarTokenDaAba, marcarSaida } from "@/lib/sessao";
+import { useMarca } from "@/lib/useMarca";
 
 /**
  * Carrega o usuário da sessão desta aba; sem sessão, volta para a tela de entrada, e com o perfil errado,
  * para a tela do perfil certo. Até conferir, `usuario` é null: a tela mostra só `<VerificandoSessao />`.
  * Guarda o token que vem junto: a partir daí a aba fica com este usuário, mesmo que outra aba entre com outro.
+ * A tela ganha a marca da empresa do usuário (cores, logo, portal), que fica guardada na aba.
  */
 export function useSessao(perfil?: Usuario["perfil"]) {
   const router = useRouter();
@@ -21,6 +24,7 @@ export function useSessao(perfil?: Usuario["perfil"]) {
     api<Usuario>("/auth/me")
       .then((u) => {
         guardarTokenDaAba(u.token);
+        aplicarMarca(u.empresa_id);
         if (perfil && u.perfil !== perfil) router.replace(u.perfil === "analista" ? "/triagem" : "/chamado");
         else setUsuario(u);
       })
@@ -56,6 +60,7 @@ export function VerificandoSessao({ erro }: { erro: string | null }) {
 
 /**
  * Cabeçalho de todas as telas. `conectado` mostra o estado do WebSocket; sem ele (undefined), o selo não aparece.
+ * Com a marca de uma empresa, mostra o símbolo e o portal dela no lugar do logo Kaffa e do nome do produto.
  */
 export function Cabecalho({
   usuario,
@@ -67,6 +72,7 @@ export function Cabecalho({
   conectado?: boolean;
 }) {
   const router = useRouter();
+  const marca = useMarca();
 
   async function sair() {
     marcarSaida();
@@ -77,10 +83,18 @@ export function Cabecalho({
 
   return (
     <header className="cabecalho">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/kaffa-negativo.svg" alt="Kaffa" />
+      {marca ? (
+        <span className="marca">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={marca.simbolo} alt="" />
+          <span className="assinatura">{marca.assinatura}</span>
+        </span>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src="/kaffa-negativo.svg" alt="Kaffa" />
+      )}
       <Link href="/" className="produto">
-        {produto}
+        {marca?.portal ?? produto}
       </Link>
       {conectado !== undefined && (
         <span

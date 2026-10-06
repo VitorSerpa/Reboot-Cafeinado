@@ -36,9 +36,197 @@
   --bolha-analista: rgba(73, 146, 182, 0.24);
   --bolha-propria: #ececec;
   --bolha-propria-texto: var(--soft-black);
+  --autor-agente: var(--laranja);
+
+  /* Destaque: botão principal, foco, item ativo. */
+  --destaque: var(--laranja);
+  --destaque-escuro: var(--laranja-escuro);
+  --destaque-texto: var(--branco);
+
+  --cabecalho-texto: var(--texto);
+  --cabecalho-suave: #dddddd;
+  --cabecalho-borda: #555555;
+  --cabecalho-linha: 1px solid #333333;
+  --cabecalho-produto: var(--texto);
+  --cabecalho-destaque: var(--laranja);
+
+  /* Status: fundo translúcido da cor, texto claro da mesma cor (no tema claro, texto escuro). */
+  --erro-fundo: rgba(223, 32, 64, 0.18);
+  --erro-texto: #ff9fb0;
+  --atencao-fundo: rgba(242, 215, 13, 0.13);
+  --atencao-texto: #f3e27c;
+  --info-fundo: rgba(73, 146, 182, 0.22);
+  --info-texto: #a6d0e6;
+  --ok-fundo: rgba(64, 191, 85, 0.16);
+  --ok-texto: #95dea1;
+  --alerta-fundo: rgba(232, 143, 18, 0.2);
+  --alerta-texto: #f5b85f;
+
+  --placeholder: #8a8a8a;
+  --codigo: var(--campo);
+  --selecao: rgba(232, 143, 18, 0.4);
+  /* Textura sutil de pontos do símbolo Kaffa, como no fundo institucional escuro. */
+  --textura: radial-gradient(circle, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  --textura-tamanho: 20px 20px;
+
+  --fonte-titulo: var(--font-plex), system-ui, sans-serif;
+  --fonte-texto: var(--font-roboto), system-ui, sans-serif;
+  --assinatura-peso: 700;
+  --assinatura-tamanho: 18px;
+  --assinatura-caixa: none;
+  --assinatura-espaco: 0;
 
   --raio: 10px;
+  --raio-bolha: 14px;
+  --raio-botao: 8px;
+  --raio-campo: 8px;
   --sombra: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+/*
+ * Cada empresa cliente vê o atendimento com a cara dela (lib/marcas.ts tem os textos e o logo).
+ * O atributo vem da sessão, depois do login: <html data-empresa="…">. Só os papéis mudam; as regras abaixo continuam as mesmas.
+ */
+
+/* Aurora Distribuição: corporativo, escuro, azul-marinho e âmbar. */
+:root[data-empresa="aurora"] {
+  --fundo: #0e1a2b;
+  --cabecalho: linear-gradient(100deg, #0a1322 0%, #10223d 55%, #1a3a5c 100%);
+  --cabecalho-texto: #eef2f7;
+  --cabecalho-suave: #b9c6d8;
+  --cabecalho-borda: #34507a;
+  --cabecalho-linha: 2px solid #f0a531;
+  --cabecalho-produto: #eef2f7;
+  --cabecalho-destaque: #f0a531;
+  --superficie: #15243a;
+  --superficie-alta: #1d3050;
+  --campo: #0b1524;
+  --texto: #eef2f7;
+  --texto-suave: #9fb0c6;
+  --borda: #2b4062;
+  --link: #8cc3f0;
+  --placeholder: #7f93ae;
+  --destaque: #f0a531;
+  --destaque-escuro: #d98f1c;
+  --destaque-texto: #1a1206;
+  --autor-agente: #f0a531;
+  --bolha-agente: rgba(240, 165, 49, 0.14);
+  --bolha-outro: var(--superficie-alta);
+  --bolha-analista: rgba(110, 160, 230, 0.2);
+  --bolha-propria: #e8eef6;
+  --bolha-propria-texto: #0e1a2b;
+  --selecao: rgba(240, 165, 49, 0.35);
+  --textura: radial-gradient(ellipse 90% 55% at 50% -15%, rgba(240, 165, 49, 0.13), transparent 70%);
+  --textura-tamanho: 100% 100%;
+  --fonte-titulo: var(--font-manrope), system-ui, sans-serif;
+  --fonte-texto: var(--font-inter), system-ui, sans-serif;
+  --assinatura-peso: 800;
+  --assinatura-tamanho: 16px;
+  --assinatura-caixa: uppercase;
+  --assinatura-espaco: 0.2em;
+  --raio: 8px;
+  --raio-bolha: 10px;
+  --raio-botao: 6px;
+  --raio-campo: 6px;
+}
+
+/* Rede Vitalis e Instituto Horizonte: temas claros, com o status em texto escuro. */
+:root[data-empresa="vitalis"],
+:root[data-empresa="horizonte"] {
+  color-scheme: light;
+  --erro-fundo: #fde8ec;
+  --erro-texto: #a3122e;
+  --atencao-fundo: #fff6d6;
+  --atencao-texto: #7a5b00;
+  --info-fundo: #e3f0fb;
+  --info-texto: #1d5a85;
+  --ok-fundo: #e2f5e6;
+  --ok-texto: #1e6b2e;
+  --alerta-fundo: #fdebd3;
+  --alerta-texto: #8a4b00;
+  --codigo: var(--superficie-alta);
+}
+
+/* Rede Vitalis: saúde, claro e arredondado, verde-água. */
+:root[data-empresa="vitalis"] {
+  --fundo: #eef6f5;
+  --cabecalho: #ffffff;
+  --cabecalho-texto: #16302d;
+  --cabecalho-suave: #55706c;
+  --cabecalho-borda: #cfe2df;
+  --cabecalho-linha: 3px solid #0b7a70;
+  --cabecalho-produto: #0b7a70;
+  --cabecalho-destaque: #0b7a70;
+  --superficie: #ffffff;
+  --superficie-alta: #e3f0ee;
+  --campo: #ffffff;
+  --texto: #16302d;
+  --texto-suave: #55706c;
+  --borda: #cfe2df;
+  --link: #0b6f8a;
+  --placeholder: #7d9693;
+  --destaque: #0b7a70;
+  --destaque-escuro: #08635b;
+  --destaque-texto: #ffffff;
+  --autor-agente: #08635b;
+  --bolha-agente: #dff2ef;
+  --bolha-outro: #edf3f2;
+  --bolha-analista: #e4eefb;
+  --bolha-propria: #0b7a70;
+  --bolha-propria-texto: #ffffff;
+  --selecao: rgba(11, 122, 112, 0.22);
+  --textura: radial-gradient(circle at 100% 0%, rgba(11, 122, 112, 0.1), transparent 45%),
+    radial-gradient(circle at 0% 100%, rgba(125, 211, 192, 0.2), transparent 40%);
+  --textura-tamanho: 100% 100%;
+  --fonte-titulo: var(--font-nunito), system-ui, sans-serif;
+  --fonte-texto: var(--font-nunito-sans), system-ui, sans-serif;
+  --assinatura-peso: 800;
+  --assinatura-tamanho: 22px;
+  --raio: 18px;
+  --raio-bolha: 20px;
+  --raio-botao: 999px;
+  --raio-campo: 12px;
+  --sombra: 0 1px 2px rgba(16, 48, 45, 0.06), 0 8px 24px rgba(16, 48, 45, 0.08);
+}
+
+/* Instituto Horizonte: acadêmico, claro e sóbrio, azul-índigo e dourado, títulos com serifa. */
+:root[data-empresa="horizonte"] {
+  --fundo: #f6f4ee;
+  --cabecalho: #24306e;
+  --cabecalho-texto: #ffffff;
+  --cabecalho-suave: #c9cfee;
+  --cabecalho-borda: #4a5799;
+  --cabecalho-linha: 4px solid #c99a2e;
+  --cabecalho-produto: #e3b04b;
+  --cabecalho-destaque: #e3b04b;
+  --superficie: #ffffff;
+  --superficie-alta: #eceae2;
+  --campo: #ffffff;
+  --texto: #1d2140;
+  --texto-suave: #5d6178;
+  --borda: #dcd8cc;
+  --link: #2f3e9e;
+  --placeholder: #8a8d9e;
+  --destaque: #2f3e8f;
+  --destaque-escuro: #232f70;
+  --destaque-texto: #ffffff;
+  --autor-agente: #2f3e8f;
+  --bolha-agente: #eef0fb;
+  --bolha-outro: #efede6;
+  --bolha-analista: #f7efd9;
+  --bolha-propria: #2f3e8f;
+  --bolha-propria-texto: #ffffff;
+  --selecao: rgba(201, 154, 46, 0.3);
+  --textura: none;
+  --fonte-titulo: var(--font-source-serif), Georgia, serif;
+  --fonte-texto: var(--font-source-sans), system-ui, sans-serif;
+  --assinatura-peso: 600;
+  --assinatura-tamanho: 19px;
+  --raio: 4px;
+  --raio-bolha: 8px;
+  --raio-botao: 3px;
+  --raio-campo: 3px;
+  --sombra: 0 1px 0 rgba(29, 33, 64, 0.05), 0 2px 10px rgba(29, 33, 64, 0.06);
 }
 
 /* As mesmas cores como utilitários do Tailwind, usados no chat ao vivo (bg-superficie, text-cinza, border-cinza-claro…). */
@@ -59,8 +247,10 @@
   --color-bolha-agente: var(--bolha-agente);
   --color-bolha-propria: var(--bolha-propria);
   --color-bolha-propria-texto: var(--bolha-propria-texto);
-  --font-sans: var(--font-roboto), system-ui, sans-serif;
-  --font-titulo: var(--font-plex), system-ui, sans-serif;
+  --color-destaque: var(--destaque);
+  --color-destaque-texto: var(--destaque-texto);
+  --font-sans: var(--fonte-texto);
+  --font-titulo: var(--fonte-titulo);
   --shadow-cartao: var(--sombra);
 }
 
@@ -70,21 +260,20 @@
   body {
     background-color: var(--fundo);
     color: var(--texto);
-    font-family: var(--font-roboto), system-ui, sans-serif;
+    font-family: var(--fonte-texto);
     font-size: 15px;
     line-height: 1.5;
   }
-  /* Textura sutil de pontos do símbolo Kaffa, como no fundo institucional escuro. */
   body {
-    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-    background-size: 20px 20px;
+    background-image: var(--textura);
+    background-size: var(--textura-tamanho);
     background-attachment: fixed;
   }
   h1,
   h2,
   h3,
   .titulo {
-    font-family: var(--font-plex), system-ui, sans-serif;
+    font-family: var(--fonte-titulo);
     font-weight: 600;
     margin: 0;
   }
@@ -103,15 +292,15 @@
     color: var(--link);
   }
   ::selection {
-    background: rgba(232, 143, 18, 0.4);
+    background: var(--selecao);
   }
 }
 
 /* --- cabeçalho --- */
 .cabecalho {
   background: var(--cabecalho);
-  color: var(--texto);
-  border-bottom: 1px solid #333;
+  color: var(--cabecalho-texto);
+  border-bottom: var(--cabecalho-linha);
   padding: 12px 24px;
   display: flex;
   align-items: center;
@@ -121,13 +310,32 @@
 .cabecalho img {
   height: 26px;
 }
+/* Empresa cliente: símbolo e assinatura no lugar do logo Kaffa. */
+.cabecalho .marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--cabecalho-texto);
+}
+.cabecalho .marca img {
+  height: 30px;
+  width: 30px;
+}
+.cabecalho .assinatura {
+  font-family: var(--fonte-titulo);
+  font-weight: var(--assinatura-peso);
+  font-size: var(--assinatura-tamanho);
+  text-transform: var(--assinatura-caixa);
+  letter-spacing: var(--assinatura-espaco);
+  line-height: 1;
+}
 .cabecalho .produto {
-  font-family: var(--font-plex), sans-serif;
+  font-family: var(--fonte-titulo);
   font-weight: 600;
   font-size: 17px;
-  border-left: 1px solid #555;
+  border-left: 1px solid var(--cabecalho-borda);
   padding-left: 16px;
-  color: var(--texto);
+  color: var(--cabecalho-produto);
   text-decoration: none;
 }
 .cabecalho .espaco {
@@ -135,19 +343,19 @@
 }
 .cabecalho .usuario {
   font-size: 13px;
-  color: #ddd;
+  color: var(--cabecalho-suave);
   text-align: right;
 }
 .cabecalho button {
   background: transparent;
-  color: #ddd;
-  border: 1px solid #555;
+  color: var(--cabecalho-suave);
+  border: 1px solid var(--cabecalho-borda);
   border-radius: 6px;
   padding: 4px 10px;
   cursor: pointer;
 }
 .cabecalho button:hover {
-  border-color: var(--laranja);
+  border-color: var(--cabecalho-destaque);
 }
 
 /* --- estrutura --- */
@@ -162,6 +370,10 @@
   border-radius: var(--raio);
   box-shadow: var(--sombra);
   padding: 20px;
+}
+/* Cartões com o filete dourado do Instituto Horizonte. */
+:root[data-empresa="horizonte"] .cartao {
+  border-top: 3px solid #c99a2e;
 }
 .pilha {
   display: flex;
@@ -181,10 +393,10 @@
 
 /* --- botões e campos --- */
 .botao {
-  background: var(--laranja);
-  color: var(--branco);
+  background: var(--destaque);
+  color: var(--destaque-texto);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--raio-botao);
   padding: 10px 18px;
   font-weight: 500;
   cursor: pointer;
@@ -192,7 +404,7 @@
   display: inline-block;
 }
 .botao:hover:not(:disabled) {
-  background: var(--laranja-escuro);
+  background: var(--destaque-escuro);
 }
 .botao:disabled {
   opacity: 0.45;
@@ -209,16 +421,16 @@
 .campo {
   width: 100%;
   border: 1px solid var(--borda);
-  border-radius: 8px;
+  border-radius: var(--raio-campo);
   padding: 10px 12px;
   background: var(--campo);
   color: var(--texto);
 }
 .campo::placeholder {
-  color: #8a8a8a;
+  color: var(--placeholder);
 }
 .campo:focus {
-  outline: 2px solid var(--laranja);
+  outline: 2px solid var(--destaque);
   border-color: transparent;
 }
 .campo:disabled {
@@ -231,27 +443,27 @@ label.rotulo {
   margin-bottom: 4px;
 }
 
-/* --- avisos e selos: fundo translúcido da cor de status, texto claro da mesma cor --- */
+/* --- avisos e selos: cores de status pelos papéis (--erro-fundo, --erro-texto…), que o tema claro escurece --- */
 .aviso {
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 14px;
 }
 .aviso.erro {
-  background: rgba(223, 32, 64, 0.16);
-  color: #ff9fb0;
+  background: var(--erro-fundo);
+  color: var(--erro-texto);
 }
 .aviso.atencao {
-  background: rgba(242, 215, 13, 0.13);
-  color: #f3e27c;
+  background: var(--atencao-fundo);
+  color: var(--atencao-texto);
 }
 .aviso.info {
-  background: rgba(73, 146, 182, 0.2);
-  color: #a6d0e6;
+  background: var(--info-fundo);
+  color: var(--info-texto);
 }
 .aviso.ok {
-  background: rgba(64, 191, 85, 0.15);
-  color: #95dea1;
+  background: var(--ok-fundo);
+  color: var(--ok-texto);
 }
 .selo {
   display: inline-block;
@@ -264,20 +476,20 @@ label.rotulo {
   white-space: nowrap;
 }
 .selo.laranja {
-  background: rgba(232, 143, 18, 0.2);
-  color: #f5b85f;
+  background: var(--alerta-fundo);
+  color: var(--alerta-texto);
 }
 .selo.verde {
-  background: rgba(64, 191, 85, 0.18);
-  color: #95dea1;
+  background: var(--ok-fundo);
+  color: var(--ok-texto);
 }
 .selo.vermelho {
-  background: rgba(223, 32, 64, 0.2);
-  color: #ff9fb0;
+  background: var(--erro-fundo);
+  color: var(--erro-texto);
 }
 .selo.azul {
-  background: rgba(73, 146, 182, 0.24);
-  color: #a6d0e6;
+  background: var(--info-fundo);
+  color: var(--info-texto);
 }
 
 /* --- chat do chamado --- */
@@ -290,7 +502,7 @@ label.rotulo {
 .bolha {
   max-width: 78%;
   padding: 10px 14px;
-  border-radius: 14px;
+  border-radius: var(--raio-bolha);
   white-space: pre-wrap;
 }
 /* Quem está olhando fica à direita: o solicitante em /chamado, o atendente em /triagem. */
@@ -307,7 +519,7 @@ label.rotulo {
   align-self: flex-end;
   background: var(--bolha-propria);
   color: var(--bolha-propria-texto);
-  border-bottom-left-radius: 14px;
+  border-bottom-left-radius: var(--raio-bolha);
   border-bottom-right-radius: 4px;
 }
 .bolha.agente {
@@ -323,7 +535,7 @@ label.rotulo {
   margin-bottom: 2px;
 }
 .bolha.agente .autor {
-  color: var(--laranja);
+  color: var(--autor-agente);
   opacity: 1;
 }
 .bolha.sistema {
@@ -346,7 +558,7 @@ label.rotulo {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--laranja);
+  background: var(--destaque);
   animation: pulsar 1.2s ease-in-out infinite;
 }
 @keyframes pulsar {
@@ -385,7 +597,7 @@ label.rotulo {
   border-color: var(--borda);
 }
 .item-fila.ativo {
-  border-color: var(--laranja);
+  border-color: var(--destaque);
 }
 .item-fila .resumo {
   font-size: 13px;
@@ -431,7 +643,7 @@ details.consulta.falhou {
 details.consulta pre {
   white-space: pre-wrap;
   word-break: break-word;
-  background: var(--campo);
+  background: var(--codigo);
   padding: 8px;
   border-radius: 6px;
   max-height: 240px;
