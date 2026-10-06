@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { after, before, test } from "node:test";
 
 // Antes de importar o app: banco local e Hub simulado, qualquer que seja o .env desta máquina.
+// Os prompts gerados vão para uma pasta temporária: os de hub/prompts/ são os que vão para o Hub.
 process.env.DATABASE_URL = "";
 process.env.HUB_MODE = "simulado";
+process.env.PROMPTS_DIR = mkdtempSync(join(tmpdir(), "prompts-"));
 
 const { comoSistema, db, fecharBanco, iniciarBanco } = await import("../db/index.js");
 const empresas = await import("./empresas.js");

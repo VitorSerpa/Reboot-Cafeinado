@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { db } from "../db/index.js";
 import { hub, HubIndisponivel, type ResultadoTurno, type ToolCall } from "../hub/index.js";
-import { aplicarRegras, lerContrato, TETO_PERGUNTAS, type Contrato } from "./contrato.js";
+import { aplicarRegras, LIMITE_REJEICOES, lerContrato, semSentido, TETO_PERGUNTAS, type Contrato } from "./contrato.js";
 import { ErroApp } from "./erros.js";
 import { avisarChamado, eventos, type FaseAgente } from "./eventos.js";
 import type { Usuario } from "./usuarios.js";
@@ -11,10 +11,12 @@ export interface Chamado {
   id: number;
   empresa_id: string;
   solicitante_id: string;
-  status: "qualificando" | "aguardando_triagem" | "triado";
+  status: "qualificando" | "aguardando_triagem" | "triado" | "rejeitado";
   texto_inicial: string;
   hub_session_id: string | null;
   n_perguntas: number;
+  /** Vezes seguidas que o agente considerou o pedido fora do escopo. */
+  rejeicoes: number;
   resultado: Contrato | null;
   ajustes: string[];
   qualificado_sem_ia: boolean;
@@ -74,8 +76,14 @@ export const MAX_MENSAGEM = 2000;
 
 const AVISO_FILA = "Seu chamado está com o suporte. Um atendente vai responder aqui mesmo, nesta conversa.";
 
+const AVISO_REJEITADO =
+  "Este pedido foi encerrado sem ir para o suporte. Se for um problema com um sistema, um acesso ou um equipamento, abra um novo chamado e conte o que aconteceu.";
+
+const PECA_O_RELATO =
+  "Não entendi o que aconteceu. Conte com suas palavras: qual sistema, o que você tentava fazer e o que apareceu.";
+
 /** O agente terminou (ou o formulário curto foi preenchido): a partir daqui, a conversa é com o atendente. */
-async function avisarQueEntrouNaFila(chamadoId: number) {
+export async function avisarQueEntrouNaFila(chamadoId: number) {
   await db.query(`insert into turnos (chamado_id, papel, texto) values ($1, 'sistema', $2)`, [chamadoId, AVISO_FILA]);
 }
 
@@ -103,8 +111,14 @@ export function notaDoSistema(perguntasFeitas: number, agora = new Date()) {
   return `[Sistema: hoje é ${HOJE.format(agora)}. Perguntas já feitas: ${perguntasFeitas} de ${TETO_PERGUNTAS}.${limite}]`;
 }
 
-function montarMensagem(tipo: "relato" | "resposta", texto: string, perguntasFeitas: number) {
-  const cabecalho = tipo === "relato" ? "Relato inicial do solicitante:" : "Resposta do solicitante:";
+const CABECALHO = {
+  relato: "Relato inicial do solicitante:",
+  novo_relato: "Novo relato do solicitante (a mensagem anterior estava fora do escopo):",
+  resposta: "Resposta do solicitante:",
+} as const;
+
+function montarMensagem(tipo: keyof typeof CABECALHO, texto: string, perguntasFeitas: number) {
+  const cabecalho = CABECALHO[tipo];
   return `${cabecalho}\n${texto}\n\n${notaDoSistema(perguntasFeitas)}`;
 }
 
@@ -233,20 +247,28 @@ async function rodarTurno(chamado: Chamado, mensagemAgente: string) {
   );
 
   const perguntou = contrato.status === "perguntando";
+  // Fora do escopo: na primeira vez, o solicitante pode descrever de novo; na segunda seguida, o pedido é encerrado
+  // sem ir para a fila. O que é chamado de verdade e o agente não soube qualificar é abstenção, e vai para o analista.
+  const rejeitou = contrato.status === "fora_do_escopo";
+  const encerrou = rejeitou && chamado.rejeicoes + 1 >= LIMITE_REJEICOES;
   // Sem passo de envio: quando o agente conclui, o chamado já entra na fila e o atendente assume o chat.
-  const novoStatus = perguntou ? "qualificando" : "aguardando_triagem";
+  const novoStatus = encerrou ? "rejeitado" : perguntou || rejeitou ? "qualificando" : "aguardando_triagem";
 
   await db.query(
     `update chamados set
        resultado = $2, ajustes = ajustes || $3::jsonb,
        n_perguntas = n_perguntas + $4, status = $5,
        tokens_input = tokens_input + $6, tokens_output = tokens_output + $7, latencia_ms = latencia_ms + $8,
+       rejeicoes = case when $9 then rejeicoes + 1 else 0 end,
        enviado_em = case when $5 = 'aguardando_triagem' then now() else enviado_em end,
        atualizado_em = now()
      where id = $1`,
-    [chamado.id, JSON.stringify(contrato), JSON.stringify(ajustes), perguntou ? 1 : 0, novoStatus, tokensIn, tokensOut, latencia],
+    [chamado.id, JSON.stringify(contrato), JSON.stringify(ajustes), perguntou ? 1 : 0, novoStatus, tokensIn, tokensOut, latencia, rejeitou],
   );
-  if (!perguntou) await avisarQueEntrouNaFila(chamado.id);
+  if (novoStatus === "aguardando_triagem") await avisarQueEntrouNaFila(chamado.id);
+  if (novoStatus === "rejeitado") {
+    await db.query(`insert into turnos (chamado_id, papel, texto) values ($1, 'sistema', $2)`, [chamado.id, AVISO_REJEITADO]);
+  }
 
   avisarChamado(chamado);
   return carregar(chamado.id);
@@ -256,6 +278,8 @@ export async function abrirChamado(usuario: Usuario, texto: string) {
   if (usuario.perfil !== "solicitante") throw new ErroApp(403, "perfil", "Só solicitantes abrem chamados.");
   const relato = texto.trim();
   if (relato.length < 5) throw new ErroApp(400, "relato_curto", "Conte um pouco mais sobre o que está acontecendo.");
+  // Sem letras, não há o que qualificar: recusa antes de abrir o chamado e de gastar o agente.
+  if (semSentido(relato)) throw new ErroApp(400, "relato_sem_sentido", PECA_O_RELATO);
 
   const novo = await db.one<Chamado>(
     `insert into chamados (empresa_id, solicitante_id, status, texto_inicial) values ($1, $2, 'qualificando', $3) returning *`,
@@ -277,10 +301,14 @@ export async function responder(usuario: Usuario, id: number, texto: string) {
   if (chamado.status !== "qualificando") throw new ErroApp(409, "fora_de_fluxo", "Este chamado não está mais esperando resposta.");
   const resposta = texto.trim();
   if (!resposta) throw new ErroApp(400, "vazio", "Escreva uma resposta.");
+  // Depois de uma rejeição, a mensagem é um relato novo, e vale a mesma checagem da abertura.
+  // Respostas às perguntas do agente ("sim", "2") podem ser curtas.
+  const novoRelato = chamado.resultado?.status === "fora_do_escopo";
+  if (novoRelato && semSentido(resposta)) throw new ErroApp(400, "relato_sem_sentido", PECA_O_RELATO);
 
   await db.query(`insert into turnos (chamado_id, papel, texto) values ($1, 'solicitante', $2)`, [id, resposta]);
   avisarChamado(chamado);
-  return rodarTurno(chamado, montarMensagem("resposta", resposta, chamado.n_perguntas));
+  return rodarTurno(chamado, montarMensagem(novoRelato ? "novo_relato" : "resposta", resposta, chamado.n_perguntas));
 }
 
 /**
@@ -291,6 +319,9 @@ export async function enviarMensagem(usuario: Usuario, id: number, texto: string
   const chamado = await carregarComAcesso(usuario, id);
   if (chamado.status === "qualificando") {
     throw new ErroApp(409, "fora_de_fluxo", "O assistente ainda está qualificando este chamado.");
+  }
+  if (chamado.status === "rejeitado") {
+    throw new ErroApp(409, "fora_de_fluxo", "Este pedido foi encerrado sem ir para o suporte. Abra um novo chamado.");
   }
   const mensagem = texto.trim();
   if (!mensagem) throw new ErroApp(400, "vazio", "Escreva uma mensagem.");
@@ -310,8 +341,8 @@ export async function enviarMensagem(usuario: Usuario, id: number, texto: string
 export async function contingencia(usuario: Usuario, id: number, campos: Record<string, string>) {
   exigirSolicitante(usuario);
   const chamado = await carregarComAcesso(usuario, id);
-  if (chamado.status === "aguardando_triagem" || chamado.status === "triado") {
-    throw new ErroApp(409, "fora_de_fluxo", "Este chamado já foi enviado.");
+  if (chamado.status !== "qualificando") {
+    throw new ErroApp(409, "fora_de_fluxo", chamado.status === "rejeitado" ? "Este pedido foi encerrado. Abra um novo chamado." : "Este chamado já foi enviado.");
   }
   const informacoes = Object.fromEntries(CAMPOS_CONTINGENCIA.map((c) => [c.chave, (campos[c.chave] ?? "").trim() || null]));
   const resultado: Contrato = {

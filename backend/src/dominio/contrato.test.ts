@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { aplicarRegras, lerContrato, MENSAGEM_PRONTO, type Contrato } from "./contrato.js";
+import { aplicarRegras, lerContrato, MENSAGEM_PRONTO, semSentido, type Contrato } from "./contrato.js";
 
 const FILAS = ["aplicacoes-corporativas", "identidade-acessos", "infra-conectividade", "operacoes-financeiras"];
 
@@ -118,6 +118,29 @@ test("falha de ferramenta de memória não derruba a sugestão", () => {
     filasValidas: FILAS,
   });
   assert.equal(r.contrato.status, "pronto");
+});
+
+test("fora do escopo na descrição é mantido, sem fila nem confiança", () => {
+  const r = aplicarRegras(contrato({ status: "fora_do_escopo", fila_sugerida: "operacoes-financeiras", confianca: 0.8 }), {
+    perguntasAntes: 0,
+    toolCalls: [CONSULTOU],
+    filasValidas: FILAS,
+  });
+  assert.equal(r.contrato.status, "fora_do_escopo");
+  assert.equal(r.contrato.fila_sugerida, null);
+  assert.equal(r.contrato.confianca, 0);
+  assert.deepEqual(r.ajustes, []);
+});
+
+test("fora do escopo depois de perguntar vira abstenção: chamado em andamento não some", () => {
+  const r = aplicarRegras(contrato({ status: "fora_do_escopo" }), { perguntasAntes: 1, toolCalls: [CONSULTOU], filasValidas: FILAS });
+  assert.equal(r.contrato.status, "abstencao");
+  assert.match(r.ajustes[0], /fora do escopo depois de já ter perguntado/);
+});
+
+test("texto com menos de 3 letras não tem o que qualificar", () => {
+  for (const t of ["???", "1234 !!", "ok", "a1"]) assert.ok(semSentido(t), t);
+  for (const t of ["VPN caiu", "não abre", "erro 504 no portal"]) assert.ok(!semSentido(t), t);
 });
 
 test("segurança nunca é alterada", () => {

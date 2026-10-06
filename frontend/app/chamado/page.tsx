@@ -30,6 +30,7 @@ const SITUACAO: Record<Chamado["status"], string> = {
   qualificando: "Com o assistente",
   aguardando_triagem: "Com o suporte",
   triado: "Encaminhado",
+  rejeitado: "Encerrado sem envio",
 };
 
 /** Turnos só crescem: um aviso atrasado (com menos turnos) não pode apagar o que já está na tela. */
@@ -146,7 +147,11 @@ export default function AbrirChamado() {
   const r = chamado?.resultado;
   const nomeApp = (slug: string | null) => catalogo?.servicos.find((a) => a.slug === slug)?.nome ?? slug;
   /** O agente concluiu: a conversa agora é com o atendente. */
-  const comSuporte = !!chamado && chamado.status !== "qualificando";
+  const comSuporte = chamado?.status === "aguardando_triagem" || chamado?.status === "triado";
+  /** O agente considerou fora do escopo duas vezes seguidas: o pedido foi encerrado sem ir para a fila. */
+  const encerrado = chamado?.status === "rejeitado";
+  /** O agente considerou fora do escopo uma vez: a próxima mensagem é um relato novo. */
+  const pedeRelato = chamado?.status === "qualificando" && r?.status === "fora_do_escopo";
   // A mensagem pendente sai da tela quando o aviso do WebSocket já trouxe o turno gravado.
   const ultimo = estado?.turnos.at(-1);
   const mostrarPendente = pendente && !(ultimo?.papel === "solicitante" && ultimo.texto === pendente);
@@ -189,6 +194,12 @@ export default function AbrirChamado() {
                 Encaminhamos o caso ao suporte como possível incidente de segurança. Siga a orientação acima.
               </div>
             )}
+            {encerrado && (
+              <div className="aviso atencao">
+                <strong>Pedido encerrado sem ir para o suporte.</strong> Este canal é para problemas com os sistemas, os acessos e os equipamentos
+                da empresa. Se for o caso, use <strong>Novo chamado</strong> e conte o que aconteceu.
+              </div>
+            )}
             {chamado?.status === "triado" && (
               <div className="aviso ok">
                 <strong>Chamado #{chamado.id} encaminhado.</strong> Um analista revisou e mandou para a equipe responsável. Você pode continuar
@@ -212,18 +223,20 @@ export default function AbrirChamado() {
               />
             )}
 
-            {!contingencia && (
+            {!contingencia && !encerrado && (
               <div className="pilha">
                 <textarea
                   className="campo"
-                  rows={chamado ? 2 : 4}
+                  rows={chamado && !pedeRelato ? 2 : 4}
                   maxLength={comSuporte ? MAX_MENSAGEM : undefined}
                   placeholder={
                     comSuporte
                       ? "Mensagem para o suporte…"
-                      : chamado
-                        ? "Sua resposta…"
-                        : (marca?.boasVindas.exemplo ?? "Ex.: não consigo lançar o pagamento de um fornecedor no portal")
+                      : pedeRelato
+                        ? "Qual sistema, o que você tentava fazer e o que apareceu"
+                        : chamado
+                          ? "Sua resposta…"
+                          : (marca?.boasVindas.exemplo ?? "Ex.: não consigo lançar o pagamento de um fornecedor no portal")
                   }
                   value={texto}
                   disabled={!!pendente}
@@ -242,7 +255,7 @@ export default function AbrirChamado() {
                       : "Sem conexão em tempo real com o servidor. Tentando reconectar…"}
                   </span>
                   <button className="botao" onClick={falar} disabled={!texto.trim() || !!pendente || !conectado}>
-                    {comSuporte ? "Enviar" : chamado ? "Responder" : "Enviar relato"}
+                    {comSuporte ? "Enviar" : chamado && !pedeRelato ? "Responder" : "Enviar relato"}
                   </button>
                 </div>
               </div>

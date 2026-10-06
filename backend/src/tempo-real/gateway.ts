@@ -123,7 +123,7 @@ export function criarGatewayChamados(io: Server) {
         );
         nsp.to(salaUsuario(solicitanteId)).emit("chamado:atualizado", { chamado, turnos: await chamados.turnos(chamadoId) });
 
-        if (chamado.status === "aguardando_triagem" || chamado.status === "triado") {
+        if (chamado.status !== "qualificando") {
           nsp.to(salaTriagem(empresaId)).emit("triagem:fila", await triagem.filaDaEmpresa(empresaId));
           nsp.to(salaTriagem(empresaId)).emit("triagem:chamado", { chamadoId });
         }
