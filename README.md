@@ -70,7 +70,7 @@ O backend tem um servidor socket.io (`/socket.io`, porta 3333) com o namespace:
 
 Os erros do ack têm o mesmo formato da API REST (`{ erro, mensagem, ... }`); `hub_indisponivel` continua abrindo o formulário curto. A contingência e as decisões da triagem continuam na API REST, e o servidor avisa pelo WebSocket. O domínio publica as mudanças num barramento em memória (`backend/src/dominio/eventos.ts`), e o gateway (`backend/src/tempo-real/gateway.ts`) repassa às salas.
 
-O frontend fala com a API pelo rewrite do Next (`/api`) e abre o WebSocket direto no backend (`NEXT_PUBLIC_API_URL`, ou o mesmo host da página na porta 3333). O cookie de sessão vale nos dois porque cookie não depende da porta.
+O frontend fala com a API pelo rewrite do Next (`/api`) e abre o WebSocket direto no backend (`NEXT_PUBLIC_API_URL`, ou o mesmo host da página na porta 3333; na Vercel, o próprio domínio). O cookie de sessão vale nos dois porque cookie não depende da porta.
 
 Teste de ponta a ponta, com o backend rodando no Hub simulado:
 
@@ -307,6 +307,25 @@ Estas regras ficam em `backend/src/dominio/contrato.ts`, com testes em `npm test
 - fora do escopo só vale na descrição do problema: depois que o agente perguntou, vira abstenção, e o chamado vai para o analista;
 - na primeira rejeição, o solicitante pode descrever de novo; na segunda seguida, o pedido é encerrado sem ir para a fila, e o analista ainda pode trazer de volta;
 - a empresa sai sempre do usuário logado, e cada solicitante só vê os próprios chamados.
+
+## Publicar na Vercel
+
+O `vercel.json` da raiz publica o repositório como **um projeto com dois serviços** ([Vercel Services](https://vercel.com/docs/services), beta), no mesmo domínio:
+
+| Serviço | Pasta | Recebe |
+|---|---|---|
+| `backend` (Express + socket.io) | `backend/` | `/api/*` e `/socket.io/*` (o WebSocket do chat e da triagem) |
+| `frontend` (Next.js) | `frontend/` | todo o resto |
+
+- Um serviço não chama o outro pelo servidor: o navegador fala com os dois no mesmo domínio. Por isso não há bindings.
+- O conector de API (`/hub/v1`) fica sem rota pública: o Hub lê o contexto pelo conector PostgreSQL.
+- A administração (`/api/admin/*`) só responde na própria máquina: na Vercel, ela recusa. Os comandos `npm run …` continuam rodando localmente, contra o mesmo Supabase.
+
+Variáveis de ambiente do projeto (Settings → Environment Variables): as do `backend/.env.example`, com `NODE_ENV=production`, `DATABASE_URL` do **Session pooler** do Supabase, `HUB_MODE=real` e um `SESSION_SECRET` novo. Em `DATABASE_SSL_CA`, cole o **conteúdo** do certificado, não o caminho. `PORT`, `PGLITE_DIR` e `NEXT_PUBLIC_API_URL` ficam de fora.
+
+O WebSocket nas funções da Vercel está em beta e tem dois limites:
+- **A conexão cai na duração máxima da função** (300 s por padrão). O cliente reconecta sozinho e recarrega o chamado.
+- **O barramento de eventos é da instância.** Se a Vercel abrir mais de uma instância do backend, um aviso pode não chegar a quem está conectado na outra, e a tela só atualiza ao recarregar. A solução é o adapter Redis do socket.io (Upstash, pelo Marketplace da Vercel).
 
 ## Limitações do protótipo
 

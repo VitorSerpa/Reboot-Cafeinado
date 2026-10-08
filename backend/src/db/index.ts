@@ -39,13 +39,21 @@ const HOSTS_LOCAIS = ["localhost", "127.0.0.1", "::1", "[::1]"];
  * sem ela, a conexão é cifrada mas não verificada. Os parâmetros `ssl*` saem da URL porque o pg deixaria
  * a URL sobrescrever esta configuração.
  */
+/**
+ * `DATABASE_SSL_CA` é o caminho do arquivo baixado do Supabase ou o próprio conteúdo dele (PEM). O conteúdo serve onde
+ * não há arquivo, como na Vercel: cola-se o certificado inteiro na variável de ambiente.
+ */
+export const lerCertificado = (valor: string) =>
+  // Colado numa linha só, o PEM chega com "\n" escrito no lugar das quebras.
+  valor.includes("BEGIN CERTIFICATE") ? valor.replace(/\\n/g, "\n") : readFileSync(valor, "utf8");
+
 export function configPg(url: string, caminhoCa = env.db.sslCa) {
   const u = new URL(url);
   const modo = u.searchParams.get("sslmode") ?? "";
   for (const p of ["sslmode", "sslrootcert", "sslcert", "sslkey", "uselibpqcompat"]) u.searchParams.delete(p);
   const local = HOSTS_LOCAIS.includes(u.hostname);
   const ssl = caminhoCa
-    ? { ca: readFileSync(caminhoCa, "utf8"), rejectUnauthorized: true }
+    ? { ca: lerCertificado(caminhoCa), rejectUnauthorized: true }
     : modo === "disable" || (local && !modo)
       ? false
       : { rejectUnauthorized: false };

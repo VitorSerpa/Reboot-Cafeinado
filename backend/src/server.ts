@@ -46,7 +46,8 @@ const io = new Server(httpServer, {
 });
 criarGatewayChamados(io);
 
-httpServer.listen(env.port, () => {
+/** O que o terminal mostra na subida: banco, Hub, empresas e o que falta em cada uma. */
+function anunciar() {
   console.log(`[backend] http://localhost:${env.port}/api (${env.nodeEnv})  ·  banco: ${banco}`);
   console.log(`[backend] isolamento por empresa: RLS no banco (as consultas das empresas rodam como ${PAPEL_EMPRESA})`);
   console.log(`[backend] socket em ws://localhost:${env.port}/socket.io  ·  namespace /chamados (chamado e triagem)`);
@@ -80,4 +81,11 @@ httpServer.listen(env.port, () => {
         (env.db.url ? " (banco compartilhado: a subida não cria senhas)" : ""),
     );
   }
-});
+}
+
+// Na Vercel, a plataforma entrega as requisições e as conexões do WebSocket ao servidor exportado (vercel.json).
+// Fora dela, o servidor escuta na porta.
+if (process.env.VERCEL) anunciar();
+else httpServer.listen(env.port, anunciar);
+
+export default httpServer;
