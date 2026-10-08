@@ -4,7 +4,8 @@
     "backend": {
       "root": "backend",
       "framework": "express",
-      "entrypoint": "src/server.ts"
+      "entrypoint": "src/server.ts",
+      "buildCommand": "npm run typecheck"
     },
     "frontend": {
       "root": "frontend",
