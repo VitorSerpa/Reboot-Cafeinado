@@ -116,6 +116,13 @@ test("SSL: Supabase cifra sempre, localhost não, e a URL não sobrescreve a con
   assert.equal(configPg("postgres://u:p@exemplo.com:5432/db?sslmode=disable", "").ssl, false);
 });
 
+test("SSL: o certificado do Supabase vale como conteúdo na variável (Vercel), inclusive numa linha só", () => {
+  const pem = "-----BEGIN CERTIFICATE-----\nMIIDxzCCAq+gAwIBAgIU\n-----END CERTIFICATE-----";
+  const url = "postgresql://postgres.ref:x@aws-0-sa-east-1.pooler.supabase.com:5432/postgres";
+  assert.deepEqual(configPg(url, pem).ssl, { ca: pem, rejectUnauthorized: true });
+  assert.deepEqual(configPg(url, pem.replace(/\n/g, "\\n")).ssl, { ca: pem, rejectUnauthorized: true });
+});
+
 test("ferramentas do conector PostgreSQL contam como consulta ao catálogo", () => {
   for (const nome of [
     "run_query",
